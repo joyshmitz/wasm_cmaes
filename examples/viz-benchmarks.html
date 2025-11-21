@@ -254,7 +254,15 @@
 
   <script type="module">
     import init, { WasmCmaes } from "../pkg/cmaes_wasm.js";
-    import lucideIcons from "https://unpkg.com/lucide-static@0.321.0/icons.json" assert { type: "json" };
+
+    // Load lucide icon paths (fallback-safe)
+    let lucideIcons = {};
+    try {
+      const res = await fetch("https://unpkg.com/lucide-static@0.321.0/icons.json");
+      if (res.ok) lucideIcons = await res.json();
+    } catch (_) {
+      lucideIcons = {};
+    }
 
     // Monaco editor setup
     const defaultCustomCode = `// Return a scalar fitness; lower is better
@@ -282,6 +290,16 @@ function f(x) {
     });
 
     let customFn = (x) => x.reduce((s, v) => s + v * v, 0);
+
+    function safeCustom(x) {
+      try {
+        const v = customFn(x);
+        return Number.isFinite(v) ? v : 1e9;
+      } catch (e) {
+        console.warn('Custom fn error', e);
+        return 1e9;
+      }
+    }
 
     const benchFns = {
       sphere: {
@@ -363,7 +381,7 @@ function f(x) {
       },
       custom: {
         title: "Custom",
-        f: (x) => customFn(x),
+        f: (x) => safeCustom(x),
         x0: [0, 0],
       },
     };
