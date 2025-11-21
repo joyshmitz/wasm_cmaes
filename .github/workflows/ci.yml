@@ -43,14 +43,14 @@ jobs:
         uses: oven-sh/setup-bun@v1
         with:
           bun-version: latest
-      - name: Install Playwright (Chromium)
+      - name: Install test tooling (Playwright + http-server)
         run: |
-          bun install playwright@1.48.2
-          npx playwright install chromium
+          bun add -d playwright@1.48.2 http-server
+          bunx playwright install chromium
       - name: Serve and smoke-test with Playwright (Chromium headless)
         env:
           PORT: 4173
         run: |
-          bun x http-server . -p $PORT >/tmp/http.log 2>&1 &
+          bunx http-server . -p $PORT >/tmp/http.log 2>&1 &
           sleep 3
-          bun x playwright test --reporter=list --config=.github/workflows/playwright.config.js
+          bunx playwright test --reporter=list --config=.github/workflows/playwright.config.cjs
