@@ -1,0 +1,423 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>CMA-ES Benchmark Gallery</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+  <style>
+    :root {
+      color-scheme: dark;
+    }
+    body {
+      min-height: 100vh;
+      color: #e2e8f0;
+      background: radial-gradient(circle at 20% 20%, #122341, #0c162a 40%, #070d1a 70%, #050912);
+      position: relative;
+      overflow-x: hidden;
+    }
+    /* animated grid backdrop */
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      background: linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px),
+                  linear-gradient(0deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+      background-size: 80px 80px;
+      mask-image: radial-gradient(circle at 50% 40%, rgba(255,255,255,0.4), transparent 65%);
+      z-index: 0;
+      animation: drift 30s linear infinite;
+    }
+    body::after {
+      content: "";
+      position: fixed;
+      inset: 0;
+      background: radial-gradient(circle at 70% 20%, rgba(56,189,248,0.18), transparent 45%),
+                  radial-gradient(circle at 25% 70%, rgba(99,102,241,0.14), transparent 50%);
+      z-index: 0;
+      pointer-events: none;
+    }
+    @keyframes drift {
+      from { transform: translate3d(0,0,0); }
+      to   { transform: translate3d(80px,80px,0); }
+    }
+    .panel {
+      position: relative;
+      backdrop-filter: blur(12px);
+      background: linear-gradient(135deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02));
+      border: 1px solid rgba(255,255,255,0.08);
+      box-shadow: 0 20px 70px rgba(0,0,0,0.45), 0 0 0 1px rgba(255,255,255,0.04) inset;
+      z-index: 1;
+    }
+    .glow {
+      box-shadow: 0 18px 40px rgba(56,189,248,0.35), 0 0 0 1px rgba(14,165,233,0.35);
+    }
+    .chart text { fill: #cbd5e1; }
+    .chart .axis line, .chart .axis path { stroke: #64748b; }
+  </style>
+</head>
+<body class="min-h-screen">
+  <div class="max-w-6xl mx-auto py-10 px-6 space-y-6 relative z-10">
+    <header class="flex flex-col gap-3">
+      <div class="inline-flex items-center gap-3 bg-sky-500/10 text-sky-200 px-3 py-1 rounded-full w-fit border border-sky-500/20">
+        <span class="w-2 h-2 rounded-full bg-emerald-300 animate-pulse"></span>
+        <span class="text-xs tracking-[0.25em] uppercase">CMA-ES · WebAssembly</span>
+      </div>
+      <div class="flex flex-col gap-2">
+        <h1 class="text-4xl font-semibold text-sky-50">Benchmark Playground</h1>
+        <p class="text-slate-200 max-w-3xl">Pick a classic test function and watch CMA-ES explore in 2D. Smooth log-loss, animated scatter, live best tracker. Tunable λ, σ, seeds.</p>
+      </div>
+      <div class="grid sm:grid-cols-3 gap-3">
+        <div class="panel rounded-xl p-3">
+          <p class="text-xs text-slate-400">Bundle</p>
+          <p class="text-lg font-semibold text-sky-100">Sequential (pkg)</p>
+          <p class="text-xs text-slate-400">Swap to parallel by importing pkg-par in the script tag.</p>
+        </div>
+        <div class="panel rounded-xl p-3">
+          <p class="text-xs text-slate-400">Rendering</p>
+          <p class="text-lg font-semibold text-amber-200">D3 + Tailwind</p>
+          <p class="text-xs text-slate-400">Log curve + candidate scatter with adaptive scales.</p>
+        </div>
+        <div class="panel rounded-xl p-3">
+          <p class="text-xs text-slate-400">Live status</p>
+          <p id="status" class="text-lg font-semibold text-emerald-200">Idle</p>
+          <p class="text-xs text-slate-400">Tracks iterations/evals on the fly.</p>
+        </div>
+      </div>
+    </header>
+
+    <section class="grid lg:grid-cols-3 gap-4">
+      <div class="panel rounded-xl p-5 space-y-4 col-span-1">
+        <div class="space-y-2">
+          <label class="block text-sm text-slate-400">Benchmark</label>
+          <select id="bench" class="w-full rounded-lg bg-slate-900 border border-slate-700 px-3 py-2 text-slate-100">
+            <option value="sphere">Sphere (smooth)</option>
+            <option value="rastrigin">Rastrigin (multimodal)</option>
+            <option value="ackley">Ackley (flat valley)</option>
+            <option value="griewank">Griewank (oscillatory)</option>
+            <option value="schwefel">Schwefel (deceptive)</option>
+            <option value="levy">Levy (broad ridges)</option>
+            <option value="zakharov">Zakharov (ill-conditioned)</option>
+            <option value="alpine">Alpine N1 (spiky)</option>
+            <option value="bukin6">Bukin N.6 (steep valley)</option>
+          </select>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-sm text-slate-400">Lambda (pop)</label>
+            <input id="lambda" type="number" value="32" min="4" max="128" class="w-full rounded-lg bg-slate-900 border border-slate-700 px-3 py-2 text-slate-100" />
+          </div>
+          <div>
+            <label class="block text-sm text-slate-400">Sigma</label>
+            <input id="sigma" type="number" value="1.2" step="0.1" class="w-full rounded-lg bg-slate-900 border border-slate-700 px-3 py-2 text-slate-100" />
+          </div>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-sm text-slate-400">Max iters</label>
+            <input id="iters" type="number" value="250" min="10" max="2000" class="w-full rounded-lg bg-slate-900 border border-slate-700 px-3 py-2 text-slate-100" />
+          </div>
+          <div>
+            <label class="block text-sm text-slate-400">Seed</label>
+            <input id="seed" type="number" value="42" min="0" class="w-full rounded-lg bg-slate-900 border border-slate-700 px-3 py-2 text-slate-100" />
+          </div>
+        </div>
+        <div class="flex flex-wrap items-center gap-3">
+          <button id="run" class="glow bg-sky-500 hover:bg-sky-400 text-slate-900 font-semibold px-4 py-2 rounded-lg transition">Run (WASM CMA-ES)</button>
+          <button id="run-js" class="bg-amber-400/90 hover:bg-amber-300 text-slate-900 font-semibold px-4 py-2 rounded-lg transition">Run baseline (JS)</button>
+          <div class="text-sm text-slate-300">Real-time render for WASM; JS baseline runs headless and reports timing.</div>
+        </div>
+        <div class="text-xs text-slate-400 space-y-1">
+          <div><span class="text-emerald-200">WASM</span> uses the Rust CMA-ES with SIMD (if enabled); chart drives the visible step loop.</div>
+          <div><span class="text-amber-200">Baseline JS</span> is a simple (μ+λ) strategy in vanilla JS for rough speed comparison.</div>
+          <div id="timing" class="text-slate-200 font-semibold"></div>
+        </div>
+      </div>
+
+      <div class="panel rounded-xl p-5 col-span-2 space-y-4">
+        <div class="flex justify-between items-center text-slate-300 text-sm">
+          <span>Best f(t)</span>
+          <span id="best-display">–</span>
+        </div>
+        <svg id="line" class="chart w-full" viewBox="0 0 800 320"></svg>
+        <div class="flex justify-between items-center text-slate-300 text-sm">
+          <span>Candidate scatter (2D slice)</span>
+          <span id="iter-display">Iter 0</span>
+        </div>
+        <svg id="scatter" class="chart w-full" viewBox="0 0 800 360"></svg>
+      </div>
+    </section>
+  </div>
+
+  <script type="module">
+    import init, { WasmCmaes } from "../pkg/cmaes_wasm.js";
+
+    const benchFns = {
+      sphere: {
+        title: "Sphere",
+        f: (x) => x[0] * x[0] + x[1] * x[1],
+        x0: [3, -2],
+      },
+      rastrigin: {
+        title: "Rastrigin",
+        f: (x) => {
+          const A = 10;
+          return 2 * A + x.reduce((s, xi) => s + (xi * xi - A * Math.cos(2 * Math.PI * xi)), 0);
+        },
+        x0: [3, -3],
+      },
+      ackley: {
+        title: "Ackley",
+        f: (x) => {
+          const a = 20, b = 0.2, c = 2 * Math.PI;
+          const sumSq = x.reduce((s, xi) => s + xi * xi, 0);
+          const sumCos = x.reduce((s, xi) => s + Math.cos(c * xi), 0);
+          return -a * Math.exp(-b * Math.sqrt(sumSq / x.length)) - Math.exp(sumCos / x.length) + a + Math.E;
+        },
+        x0: [2.5, -2.5],
+      },
+      griewank: {
+        title: "Griewank",
+        f: (x) => {
+          const sum = x.reduce((s, xi) => s + (xi * xi) / 4000, 0);
+          const prod = x.reduce((p, xi, i) => p * Math.cos(xi / Math.sqrt(i + 1)), 1);
+          return sum - prod + 1;
+        },
+        x0: [4, -3],
+      },
+      schwefel: {
+        title: "Schwefel",
+        f: (x) => {
+          const bias = 418.9829 * x.length;
+          const s = x.reduce((acc, xi) => acc + xi * Math.sin(Math.sqrt(Math.abs(xi))), 0);
+          return bias - s;
+        },
+        x0: [200, -150],
+      },
+      levy: {
+        title: "Levy",
+        f: (x) => {
+          const w = x.map((xi) => 1 + (xi - 1) / 4);
+          const term1 = Math.pow(Math.sin(Math.PI * w[0]), 2);
+          let sum = 0;
+          for (let i = 0; i < w.length - 1; i++) {
+            sum += Math.pow(w[i] - 1, 2) * (1 + 10 * Math.pow(Math.sin(Math.PI * w[i] + 1), 2));
+          }
+          const term3 = Math.pow(w[w.length - 1] - 1, 2) * (1 + Math.pow(Math.sin(2 * Math.PI * w[w.length - 1]), 2));
+          return term1 + sum + term3;
+        },
+        x0: [1.5, -1.5],
+      },
+      zakharov: {
+        title: "Zakharov",
+        f: (x) => {
+          const sum1 = x.reduce((s, xi) => s + xi * xi, 0);
+          const sum2 = x.reduce((s, xi, i) => s + 0.5 * (i + 1) * xi, 0);
+          return sum1 + Math.pow(sum2, 2) + Math.pow(sum2, 4);
+        },
+        x0: [2.0, -2.0],
+      },
+      alpine: {
+        title: "Alpine N1",
+        f: (x) => x.reduce((s, xi) => s + Math.abs(xi * Math.sin(xi) + 0.1 * xi), 0),
+        x0: [4.5, -4.0],
+      },
+      bukin6: {
+        title: "Bukin N.6",
+        f: (x) => {
+          const [x1, x2] = x;
+          return 100 * Math.sqrt(Math.abs(x2 - 0.01 * x1 * x1)) + 0.01 * Math.abs(x1 + 10);
+        },
+        x0: [-12, 2.5],
+      },
+    };
+
+    const lineSvg = d3.select('#line');
+    const scatterSvg = d3.select('#scatter');
+    const lineMargin = { top: 10, right: 10, bottom: 30, left: 50 };
+    const scatterMargin = { top: 10, right: 10, bottom: 40, left: 50 };
+
+    const width = 800, height = 320;
+    const scatWidth = 800, scatHeight = 360;
+
+    const lineG = lineSvg.append('g').attr('transform', `translate(${lineMargin.left},${lineMargin.top})`);
+    const scatterG = scatterSvg.append('g').attr('transform', `translate(${scatterMargin.left},${scatterMargin.top})`);
+
+    const lineX = d3.scaleLinear().range([0, width - lineMargin.left - lineMargin.right]);
+    const lineY = d3.scaleLog().clamp(true).range([height - lineMargin.top - lineMargin.bottom, 0]);
+
+    const scatX = d3.scaleLinear().range([0, scatWidth - scatterMargin.left - scatterMargin.right]);
+    const scatY = d3.scaleLinear().range([scatHeight - scatterMargin.top - scatterMargin.bottom, 0]);
+
+    lineG.append('g').attr('class', 'axis axis-x').attr('transform', `translate(0,${height - lineMargin.top - lineMargin.bottom})`);
+    lineG.append('g').attr('class', 'axis axis-y');
+    scatterG.append('g').attr('class', 'axis axis-x').attr('transform', `translate(0,${scatHeight - scatterMargin.top - scatterMargin.bottom})`);
+    scatterG.append('g').attr('class', 'axis axis-y');
+
+    const linePath = lineG.append('path').attr('fill', 'none').attr('stroke', '#38bdf8').attr('stroke-width', 2.5);
+    const bestDot = scatterG.append('circle').attr('r', 6).attr('fill', '#fbbf24').attr('stroke', '#0f172a').attr('stroke-width', 2);
+    const cloud = scatterG.append('g').attr('class', 'cloud');
+
+    const statusEl = document.getElementById('status');
+    const bestEl = document.getElementById('best-display');
+    const iterEl = document.getElementById('iter-display');
+
+    async function run() {
+      statusEl.textContent = 'Initializing wasm...';
+      await init();
+
+      const bench = benchFns[document.getElementById('bench').value];
+      const lambda = Number(document.getElementById('lambda').value) || 32;
+      const sigma = Number(document.getElementById('sigma').value) || 1.2;
+      const maxIter = Number(document.getElementById('iters').value) || 250;
+      const seed = Number(document.getElementById('seed').value) || 42;
+
+      const opts = { popsize: lambda, seed, maxEvals: lambda * maxIter }; // soft stop
+      const x0 = new Float64Array(bench.x0);
+      const es = new WasmCmaes(x0, sigma, opts);
+
+      const history = [];
+      let iter = 0;
+      let bestF = Infinity;
+
+      const stepOnce = () => {
+        const dim = 2;
+        const lambda = es.lambda;
+        const candFlat = es.ask_flat();
+        const fits = new Float64Array(lambda);
+        for (let k = 0; k < lambda; k++) {
+          const offset = k * dim;
+          const v = [candFlat[offset], candFlat[offset + 1]];
+          fits[k] = bench.f(v);
+        }
+        es.tell_flat(fits);
+        const res = es.result();
+        bestF = Math.min(bestF, res.best_f);
+        history.push({ iter, best: bestF });
+
+        const currentBatch = [];
+        for (let k = 0; k < lambda; k++) {
+          const offset = k * dim;
+          currentBatch.push({ x: candFlat[offset], y: candFlat[offset + 1] });
+        }
+        render(history, currentBatch, res);
+
+        iter++;
+        if (!es.stop_status().stopped && iter < maxIter) {
+          requestAnimationFrame(stepOnce);
+        } else {
+          statusEl.textContent = `Done in ${iter} iterations / ${res.evals} evals`;
+        }
+      };
+
+      statusEl.textContent = `Running ${bench.title}...`;
+      requestAnimationFrame(stepOnce);
+    }
+
+    function runJsBaseline() {
+      const bench = benchFns[document.getElementById('bench').value];
+      const lambda = Number(document.getElementById('lambda').value) || 32;
+      const sigma0 = Number(document.getElementById('sigma').value) || 1.2;
+      const maxIter = Number(document.getElementById('iters').value) || 250;
+      const seed = Number(document.getElementById('seed').value) || 42;
+
+      const rng = (() => {
+        let state = BigInt(seed || 1);
+        return () => {
+          // simple LCG
+          state = (6364136223846793005n * state + 1n) & ((1n << 64n) - 1n);
+          return Number(state >> 11n) / 9007199254740992; // 53-bit fraction
+        };
+      })();
+
+      const dim = 2;
+      let mean = bench.x0.slice();
+      let sigma = sigma0;
+      let cov = [ [1,0], [0,1] ];
+      const sample = () => {
+        // Box-Muller
+        const z = [];
+        for (let i=0;i<dim;i++) {
+          const u1 = Math.max(1e-12, 1 - rng());
+          const u2 = 1 - rng();
+          const r = Math.sqrt(-2*Math.log(u1));
+          const th = 2*Math.PI*u2;
+          z.push(r*Math.cos(th));
+        }
+        // apply diagonal sigma only (naive)
+        return [ mean[0] + sigma * z[0], mean[1] + sigma * z[1] ];
+      };
+
+      let bestF = Infinity;
+      let bestX = mean.slice();
+      const t0 = performance.now();
+      for (let iter=0; iter<maxIter; iter++) {
+        const cand = [];
+        for (let k=0;k<lambda;k++) {
+          const x = sample();
+          const f = bench.f(x);
+          cand.push({x,f});
+          if (f < bestF) { bestF = f; bestX = x; }
+        }
+        cand.sort((a,b)=>a.f-b.f);
+        const mu = Math.max(1, Math.floor(lambda/4));
+        mean = [0,0];
+        for (let i=0;i<mu;i++) {
+          mean[0] += cand[i].x[0];
+          mean[1] += cand[i].x[1];
+        }
+        mean[0] /= mu; mean[1] /= mu;
+        sigma *= 0.99; // simple anneal
+      }
+      const t1 = performance.now();
+      timing.textContent = `Baseline JS: best f=${bestF.toExponential(3)} at [${bestX.map(v=>v.toFixed(3)).join(', ')}] in ${(t1-t0).toFixed(1)} ms`;
+    }
+
+    function render(hist, batch, res) {
+      if (!hist.length) return;
+      const xDomain = [0, d3.max(hist, (d) => d.iter) + 1];
+      const yDomain = [Math.min(...hist.map((d) => d.best), 1e-6), d3.max(hist, (d) => d.best)];
+      lineX.domain(xDomain);
+      lineY.domain([Math.max(yDomain[0], 1e-6), yDomain[1]]);
+
+      lineG.select('.axis-x').call(d3.axisBottom(lineX).ticks(8).tickSizeOuter(0));
+      lineG.select('.axis-y').call(d3.axisLeft(lineY).ticks(6, "~g"));
+
+      const lineGen = d3.line()
+        .x((d) => lineX(d.iter))
+        .y((d) => lineY(d.best))
+        .curve(d3.curveCatmullRom.alpha(0.6));
+      linePath.attr('d', lineGen(hist));
+
+      // Scatter bounds adapt to candidates
+      const xs = batch.map((p) => p.x);
+      const ys = batch.map((p) => p.y);
+      const pad = 1.0;
+      scatX.domain([d3.min(xs) - pad, d3.max(xs) + pad]);
+      scatY.domain([d3.min(ys) - pad, d3.max(ys) + pad]);
+      scatterG.select('.axis-x').call(d3.axisBottom(scatX).ticks(6).tickSizeOuter(0));
+      scatterG.select('.axis-y').call(d3.axisLeft(scatY).ticks(6).tickSizeOuter(0));
+
+      const points = cloud.selectAll('circle').data(batch);
+      points.enter()
+        .append('circle')
+        .attr('r', 4)
+        .attr('fill', '#38bdf880')
+        .merge(points)
+        .attr('cx', (d) => scatX(d.x))
+        .attr('cy', (d) => scatY(d.y));
+      points.exit().remove();
+
+      bestDot
+        .attr('cx', scatX(res.best_x()[0]))
+        .attr('cy', scatY(res.best_x()[1]));
+
+      bestEl.textContent = `best f = ${res.best_f.toExponential(3)}`;
+      iterEl.textContent = `Iter ${hist[hist.length - 1].iter}`;
+    }
+
+    document.getElementById('run').addEventListener('click', run);
+    document.getElementById('run-js').addEventListener('click', runJsBaseline);
+  </script>
+</body>
+</html>

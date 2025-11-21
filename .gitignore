@@ -1,0 +1,16 @@
+# Rust build
+/target
+/target-par
+
+# wasm-pack outputs
+/pkg
+/pkg-par
+/pkg-*
+
+# Node / bundler artifacts
+node_modules/
+
+# Misc
+.DS_Store
+npm-debug.log*
+yarn-error.log*
