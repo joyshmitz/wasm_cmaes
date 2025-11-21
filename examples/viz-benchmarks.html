@@ -7,7 +7,7 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
   <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
-  <script type="module" src="https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs/loader.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs/loader.js"></script>
   <style>
     :root {
       color-scheme: dark;
@@ -130,18 +130,16 @@
         </div>
         <div class="grid grid-cols-2 gap-3 items-center">
           <div>
-            <label class="block text-sm text-slate-400">Dimension</label>
-            <input id="dim" type="range" value="2" min="2" max="8" class="w-full" />
+            <label class="block text-sm text-slate-400">Dimension (fixed)</label>
+            <input id="dim" type="range" value="2" min="2" max="2" class="w-full" disabled />
           </div>
-          <div class="text-sm text-slate-300" id="dim-label">2D (scatter uses native axes)</div>
+          <div class="text-sm text-slate-300" id="dim-label">2D surface view</div>
         </div>
         <div class="grid grid-cols-2 gap-3">
           <div>
             <label class="block text-sm text-slate-400">Projection</label>
-            <select id="projection" class="w-full rounded-lg bg-slate-900 border border-slate-700 px-3 py-2 text-slate-100">
-              <option value="auto">Auto (PCA if dim>2)</option>
+            <select id="projection" class="w-full rounded-lg bg-slate-900 border border-slate-700 px-3 py-2 text-slate-100" disabled>
               <option value="first2">First 2 dims</option>
-              <option value="pca">PCA (top-2)</option>
             </select>
           </div>
           <div>
@@ -455,13 +453,9 @@ function f(x) {
     let wasmInitialized = false;
 
     function currentDim(benchKey) {
-      let d = Number(dimInput.value) || 2;
-      if (benchKey === 'bukin6') {
-        d = 2;
-        dimInput.value = 2;
-        dimLabel.textContent = '2D required for Bukin N.6';
-      }
-      return d;
+      dimInput.value = 2;
+      dimLabel.textContent = '2D surface view';
+      return 2;
     }
 
     function buildOptions(lambda, maxIter, seed, dim) {
@@ -709,7 +703,7 @@ function f(x) {
       const maxIter = Number(document.getElementById('iters').value) || 250;
       const seed = Number(document.getElementById('seed').value) || 42;
       const dim = currentDim(benchKey);
-      dimLabel.textContent = `${dim}D (${projectionSelect.value === 'pca' ? 'PCA' : 'slice'} for scatter)`;
+      dimLabel.textContent = '2D surface view';
 
       const opts = buildOptions(lambda, maxIter, seed, dim);
 
@@ -754,12 +748,13 @@ function f(x) {
         const meanPt = { x: res.xmean()[0], y: res.xmean()[1] };
         const covMat = Array.from(es.cov_matrix());
         const cov = [covMat[0], covMat[1], covMat[2], covMat[3]];
-        playbackState.frames.push({
-          pts: proj.pts,
-          mean: meanPt,
-          cov,
-          best: proj.b,
-          bestF: res.best_f,
+      if (playbackState.frames.length > 1000) playbackState.frames.shift();
+      playbackState.frames.push({
+        pts: proj.pts,
+        mean: meanPt,
+        cov,
+        best: proj.b,
+        bestF: res.best_f,
           iter,
         });
         scrub.max = playbackState.frames.length - 1;
@@ -922,7 +917,8 @@ function f(x) {
     });
 
     dimInput.addEventListener('input', () => {
-      dimLabel.textContent = `${dimInput.value}D (${projectionSelect.value === 'pca' ? 'PCA' : 'slice'})`;
+      dimInput.value = 2;
+      dimLabel.textContent = '2D surface view';
     });
 
     const playLoop = () => {
