@@ -2,13 +2,13 @@
 
 [![Pages](https://img.shields.io/badge/GitHub%20Pages-live-22c55e)](https://dicklesworthstone.github.io/wasm_cmaes/examples/viz-benchmarks.html)
 [![Rust](https://img.shields.io/badge/Rust-✓-dea584)](https://www.rust-lang.org/)
-[![wasm-pack](https://img.shields.io/badge/wasm--pack-bundler-blueviolet)](https://github.com/rustwasm/wasm-pack)
+[![wasm-pack](https://img.shields.io/badge/wasm--pack-web-blueviolet)](https://github.com/rustwasm/wasm-pack)
 [![License](https://img.shields.io/badge/license-MIT%20%2F%20Apache--2.0-lightgrey)](LICENSE-MIT)
 
 Live demo → https://dicklesworthstone.github.io/wasm_cmaes/examples/viz-benchmarks.html
 
 ## What this is
-Rust CMA-ES compiled to WebAssembly with a friendly JS/TS API, plus a visual playground (D3 + Tailwind) and a vanilla-JS baseline for speed comparisons.
+Rust CMA-ES compiled to WebAssembly with a friendly JS/TS API, plus a visual playground (D3 + Tailwind + Three.js) and a vanilla-JS baseline for speed comparisons.
 
 ## Why CMA-ES (30-sec crash)
 - Samples λ candidates from a multivariate normal around a mean.
@@ -16,15 +16,14 @@ Rust CMA-ES compiled to WebAssembly with a friendly JS/TS API, plus a visual pla
 - Adapts step size via evolution path (`sigma`); supports full/diagonal/limited-memory covariance.
 - Stops on: max evals, ftarget, ill-conditioning, tolFun, tolX.
 
-### Architecture (mermaid)
+### Architecture
 ```mermaid
 flowchart LR
-  A[JS/TS] -- batch API / functions --> B[wasm_bindgen glue]
-  B --> C[Rust: engines full/sep/lm]
-  C --> D[LCG RNG + SIMD ops]
+  A[JS/TS] -->|batch API / functions| B[wasm_bindgen glue]
+  B --> C[Engines: full / sep / lm]
+  C --> D[LCG RNG + SIMD]
   C --> E[Rayon (optional)]
-  B --> F[serde_wasm_bindgen
-    state (to_json/from_state)]
+  B --> F[serde_wasm_bindgen (state ser/de)]
 ```
 
 ## Bundles
@@ -67,7 +66,7 @@ const result = await runCmaes(new Float64Array([0,0]), 0.2, (x)=>x[0]*x[0]+x[1]*
 ```
 
 ## Visual demos
-- `examples/viz-benchmarks.html` — D3 + Tailwind dashboard (log-loss + scatter) with controls for λ, σ, seed, iters. Benchmarks: Sphere, Rastrigin, Ackley, Griewank, Schwefel, Levy, Zakharov, Alpine N1, Bukin N.6. Includes a headless vanilla-JS baseline (μ+λ) for speed comparison.
+- `examples/viz-benchmarks.html` — D3 + Tailwind + Three.js dashboard: log-loss plot + 3D surface (orbit controls), animated candidates/ellipse, timeline scrub/playback. Controls: λ, σ, seed, iters, dim, bounds/noise, race mode (WASM vs JS), custom objective editor. Benchmarks: Sphere, Rastrigin, Ackley, Griewank, Schwefel, Levy, Zakharov, Alpine N1, Bukin N.6, custom.
 - `examples/simple-sequential.html` — minimal sphere with `pkg/`.
 - `examples/simple-parallel.html` — Rosenbrock with `pkg-par/`.
 - Root `index.html` redirects to the viz.
@@ -76,10 +75,11 @@ const result = await runCmaes(new Float64Array([0,0]), 0.2, (x)=>x[0]*x[0]+x[1]*
 `cargo test --lib -p cmaes_wasm` covers: Rosenbrock, Rastrigin, Ackley, Griewank, Schwefel.
 
 ## Performance choices
-- SIMD (`+simd128`) for wasm32, scalar fallback elsewhere.
-- Rayon optional (feature `parallel`).
+- SIMD (`+simd128`) for wasm32; scalar fallback elsewhere.
+- Parallel optional (feature `parallel`).
 - Deterministic LCG RNG with seed.
-- Batch API minimizes JS↔WASM boundary crossings.
+- Batch API minimizes JS↔WASM crossings.
+- `cov_matrix()` exported from Rust for fast visualization of full covariance.
 
 ## Deployment (GitHub Pages)
 - One-shot: `scripts/deploy.sh "chore: deploy"` (builds, stages, commits if needed, pushes to origin main; enables Pages via `gh` if available).
