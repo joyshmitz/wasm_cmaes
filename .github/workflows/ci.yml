@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Install wasm target
+        run: rustup target add wasm32-unknown-unknown
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - name: Cargo check
+        run: cargo check --lib -p cmaes_wasm
+      - name: Cargo test (unit)
+        run: cargo test --lib -p cmaes_wasm
+
+  web-demo:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Install wasm target
+        run: rustup target add wasm32-unknown-unknown
+      - name: Install wasm-pack
+        run: curl -sSf https://rustwasm.github.io/wasm-pack/installer/init.sh | sh
+      - name: Build wasm (web target)
+        run: scripts/build-all.sh
+      - name: Install bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+      - name: Install Playwright (Chromium)
+        run: |
+          bun install playwright@1.48.2
+          npx playwright install chromium
+      - name: Serve and smoke-test with Playwright (Chromium headless)
+        env:
+          PORT: 4173
+        run: |
+          bun x http-server . -p $PORT >/tmp/http.log 2>&1 &
+          sleep 3
+          bun x playwright test --reporter=list --config=.github/workflows/playwright.config.js
