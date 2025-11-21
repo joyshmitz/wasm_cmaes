@@ -45,7 +45,7 @@ jobs:
           bun-version: latest
       - name: Install test tooling (Playwright + http-server)
         run: |
-          bun add -d playwright@1.48.2 http-server
+          bun add -d playwright@1.48.2 http-server@14.1.1
           bunx playwright install chromium
       - name: Serve and smoke-test with Playwright (Chromium headless)
         env:

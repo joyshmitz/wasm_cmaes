@@ -189,8 +189,9 @@
           <div class="text-sm text-slate-300">Real-time render for WASM; JS baseline runs headless and reports timing.</div>
         </div>
         <div class="text-xs text-slate-400 space-y-1">
-          <div><span class="text-emerald-200">WASM</span> uses the Rust CMA-ES with SIMD (if enabled); chart drives the visible step loop.</div>
-          <div><span class="text-amber-200">Baseline JS</span> is a simple (μ+λ) strategy in vanilla JS for rough speed comparison.</div>
+          <div><span class="text-emerald-200">WASM</span> uses the Rust CMA-ES with SIMD (if enabled); chart drives the visible step loop on a 2D surface.</div>
+          <div><span class="text-amber-200">Baseline JS</span> is a simple (μ+λ) strategy in vanilla JS for speed comparison.</div>
+          <div class="text-slate-400">Bounds/noise settings apply to the optimizer; visualization shows the 2D slice.</div>
           <div id="timing" class="text-slate-200 font-semibold"></div>
         </div>
       </div>
