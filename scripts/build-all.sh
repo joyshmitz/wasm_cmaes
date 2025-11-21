@@ -18,7 +18,7 @@ echo ":: building parallel bundle (to pkg/, then copying to pkg-par/)" \
      "(TOOLCHAIN=$TOOLCHAIN, RUSTFLAGS=$RUSTFLAGS_PAR)"
 RUSTUP_TOOLCHAIN="$TOOLCHAIN" \
 RUSTFLAGS="$RUSTFLAGS_PAR" \
-"$WASM_PACK" build --target bundler --features parallel
+"$WASM_PACK" build --target web --features parallel
 mv pkg pkg-par
 perl -0777 -pe 's/"name":\s*"cmaes_wasm"/"name": "cmaes_wasm-par"/' \
     -i pkg-par/package.json
@@ -26,6 +26,6 @@ perl -0777 -pe 's/"name":\s*"cmaes_wasm"/"name": "cmaes_wasm-par"/' \
 echo ":: building sequential bundle -> pkg/" \
      "(TOOLCHAIN=$TOOLCHAIN)"
 RUSTUP_TOOLCHAIN="$TOOLCHAIN" \
-"$WASM_PACK" build --target bundler
+"$WASM_PACK" build --target web
 
 echo ":: done"

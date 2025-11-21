@@ -6,13 +6,11 @@
   "files": [
     "cmaes_wasm_bg.wasm",
     "cmaes_wasm.js",
-    "cmaes_wasm_bg.js",
     "cmaes_wasm.d.ts"
   ],
   "main": "cmaes_wasm.js",
   "types": "cmaes_wasm.d.ts",
   "sideEffects": [
-    "./cmaes_wasm.js",
     "./snippets/*"
   ]
 }

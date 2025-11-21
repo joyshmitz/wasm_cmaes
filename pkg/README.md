@@ -1,84 +1,106 @@
-CMA-ES for WebAssembly
-======================
+# CMA-ES for WebAssembly
 
-Purpose
-- Rust implementation of CMA-ES compiled to WebAssembly with a clean JS/TS API, plus a visual playground to compare against a vanilla JS baseline.
+[![Pages](https://img.shields.io/badge/GitHub%20Pages-live-22c55e)](https://dicklesworthstone.github.io/wasm_cmaes/examples/viz-benchmarks.html)
+[![Rust](https://img.shields.io/badge/Rust-✓-dea584)](https://www.rust-lang.org/)
+[![wasm-pack](https://img.shields.io/badge/wasm--pack-bundler-blueviolet)](https://github.com/rustwasm/wasm-pack)
+[![License](https://img.shields.io/badge/license-MIT%20%2F%20Apache--2.0-lightgrey)](LICENSE-MIT)
 
-Live demo (GitHub Pages): https://dicklesworthstone.github.io/wasm_cmaes/examples/viz-benchmarks.html
+Live demo → https://dicklesworthstone.github.io/wasm_cmaes/examples/viz-benchmarks.html
 
-Bundles
-- `pkg/` — sequential, smallest, name `cmaes_wasm`.
-- `pkg-par/` — Rayon + SIMD (`+simd128`), renamed to `cmaes_wasm-par` to avoid npm clashes.
+## What this is
+Rust CMA-ES compiled to WebAssembly with a friendly JS/TS API, plus a visual playground (D3 + Tailwind) and a vanilla-JS baseline for speed comparisons.
 
-Architecture highlights
-- Core optimizer in `src/lib.rs`: full/separable/limited-memory engines, batch API (`WasmCmaes`), single-shot APIs (`fmin`, `fmin_restarts`, `fmin_builtin`).
-- TS surface: `index.d.ts` exposes types; `cmaes_runner.ts` wraps batch calls for async browser stepping.
-- Visual demos in `examples/` use native ES modules; no bundler needed for local testing.
+## Why CMA-ES (30-sec crash)
+- Samples λ candidates from a multivariate normal around a mean.
+- Ranks candidates, updates mean + covariance using weighted best μ.
+- Adapts step size via evolution path (`sigma`); supports full/diagonal/limited-memory covariance.
+- Stops on: max evals, ftarget, ill-conditioning, tolFun, tolX.
 
-Performance considerations
-- SIMD on wasm32 via `+simd128`; guarded scalar fallback.
-- Parallel feature uses Rayon; true multithreading in browsers requires atomics and `wasm-bindgen-rayon` thread-pool init (see below).
-- Deterministic RNG (LCG) with configurable seed for repeatable runs.
-- Batch API minimizes JS↔WASM calls by exchanging flat arrays.
+### Architecture (mermaid)
+```mermaid
+flowchart LR
+  A[JS/TS] -- batch API / functions --> B[wasm_bindgen glue]
+  B --> C[Rust: engines full/sep/lm]
+  C --> D[LCG RNG + SIMD ops]
+  C --> E[Rayon (optional)]
+  B --> F[serde_wasm_bindgen
+    state (to_json/from_state)]
+```
 
-Building (both bundles)
+## Bundles
+- `pkg/` — sequential, name `cmaes_wasm`.
+- `pkg-par/` — Rayon + SIMD (`+simd128`), name `cmaes_wasm-par` (avoids npm collision).
+
+## Quick start (local, no bundler)
+```bash
+python -m http.server 8000
+# open http://localhost:8000/examples/viz-benchmarks.html
+```
+
+Minimal use in JS:
+```ts
+import init, { fmin } from "./pkg/cmaes_wasm.js";
+await init();
+const res = fmin(new Float64Array([3, -2]), 0.8, (x) => x[0]*x[0] + x[1]*x[1]);
+console.log(res.best_f, res.best_x());
+```
+
+## Building both bundles
 ```bash
 scripts/build-all.sh
 # Env knobs: TOOLCHAIN=nightly (default), WASM_PACK=wasm-pack, RUSTFLAGS_PAR="-C target-feature=+simd128"
 ```
-Script cleans `pkg/` and `pkg-par/`, builds parallel first, renames its package.json, then builds sequential.
+Script cleans `pkg/` and `pkg-par/`, builds parallel first (then renames its package.json), then builds sequential.
 
-True parallel in browsers (optional)
+### True parallel in browsers (optional)
 ```bash
 export RUSTFLAGS="-C target-feature=+atomics,+bulk-memory,+mutable-globals,+simd128"
 wasm-pack build --target bundler --features parallel --out-dir pkg-par
-# then in JS: await initThreadPool(n); (from wasm-bindgen-rayon)
+# In JS: await initThreadPool(n); // from wasm-bindgen-rayon
 ```
-Without atomics+pool, Rayon runs single-threaded even in the parallel bundle.
+Without atomics+pool, Rayon runs single-threaded even for the parallel build.
 
-Using in JS/TS
-```ts
-// Sequential
-import init, { fmin } from "./pkg/cmaes_wasm.js";
-// Parallel
-import initPar, { fmin as fminPar } from "./pkg-par/cmaes_wasm.js";
-
-await init();
-const res = fmin(new Float64Array([3, -2]), 0.8, (x) => x[0]*x[0]+x[1]*x[1]);
-```
-Batch loop via runner:
+## Runner helper (batch API)
 ```ts
 import { runCmaes } from "./cmaes_runner";
 const result = await runCmaes(new Float64Array([0,0]), 0.2, (x)=>x[0]*x[0]+x[1]*x[1]);
 ```
 
-Benchmarks & visualization
-- `examples/viz-benchmarks.html`: Tailwind + D3 dashboard (log loss + scatter) with controls for λ, σ, seed, max iters.
-- Benchmarks: Sphere, Rastrigin, Ackley, Griewank, Schwefel, Levy, Zakharov, Alpine N1, Bukin N.6.
-- Includes a headless baseline vanilla JS (μ+λ)-style ES to compare speed/quality vs WASM CMA-ES; timing displayed inline.
-- Other demos: `examples/simple-sequential.html`, `examples/simple-parallel.html`.
-Run locally: `python -m http.server 8000` then open the HTML pages.
+## Visual demos
+- `examples/viz-benchmarks.html` — D3 + Tailwind dashboard (log-loss + scatter) with controls for λ, σ, seed, iters. Benchmarks: Sphere, Rastrigin, Ackley, Griewank, Schwefel, Levy, Zakharov, Alpine N1, Bukin N.6. Includes a headless vanilla-JS baseline (μ+λ) for speed comparison.
+- `examples/simple-sequential.html` — minimal sphere with `pkg/`.
+- `examples/simple-parallel.html` — Rosenbrock with `pkg-par/`.
+- Root `index.html` redirects to the viz.
 
-CMA-ES basics (crash course)
-- Samples λ candidates from a multivariate normal around mean; updates mean and covariance using weighted best μ samples.
-- Adapts step size (`sigma`) via evolution path; supports full, diagonal, and limited-memory covariance models.
-- Stop flags: max evals, ftarget reached, condition number blow-up, tolFun, tolX.
+## Benchmarks in Rust tests
+`cargo test --lib -p cmaes_wasm` covers: Rosenbrock, Rastrigin, Ackley, Griewank, Schwefel.
 
-Testing
-- Native unit tests (`cargo test --lib -p cmaes_wasm`) cover tough benchmarks: Rosenbrock, Rastrigin, Ackley, Griewank, Schwefel.
-- Visual demo provides informal regression via live plots.
+## Performance choices
+- SIMD (`+simd128`) for wasm32, scalar fallback elsewhere.
+- Rayon optional (feature `parallel`).
+- Deterministic LCG RNG with seed.
+- Batch API minimizes JS↔WASM boundary crossings.
 
-Publishing
-- `pkg/` → npm `cmaes_wasm`.
-- `pkg-par/` → npm `cmaes_wasm-par`.
+## Deployment (GitHub Pages)
+- One-shot: `scripts/deploy.sh "chore: deploy"` (builds, stages, commits if needed, pushes to origin main; enables Pages via `gh` if available).
+- Pages URL: https://dicklesworthstone.github.io/wasm_cmaes/
 
-Project layout
+## Publishing to npm
+- `pkg/` → `cmaes_wasm`.
+- `pkg-par/` → `cmaes_wasm-par`.
+
+## Project layout
 - `src/lib.rs` – optimizer, wasm bindings, tests.
 - `index.d.ts` – TS surface.
 - `cmaes_runner.ts` – browser-friendly runner.
 - `scripts/build-all.sh` – dual-build helper.
+- `scripts/deploy.sh` – build + stage + commit + push + enable Pages (gh CLI required for Pages step; commits all staged changes).
 - `examples/` – HTML demos & visualizations.
-- `pkg/`, `pkg-par/` – generated bundles (not tracked in git typically).
+- `pkg/`, `pkg-par/` – generated bundles (tracked for Pages).
 
-Licensing
-- Dual MIT OR Apache-2.0 (`LICENSE-MIT`, `LICENSE-APACHE`).
+## Contributing & testing
+- Run `cargo test --lib -p cmaes_wasm`.
+- For visuals, serve locally as above.
+
+## Licensing
+Dual MIT OR Apache-2.0 (`LICENSE-MIT`, `LICENSE-APACHE`).

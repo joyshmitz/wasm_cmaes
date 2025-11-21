@@ -301,6 +301,12 @@ function f(x) {
       }
     }
 
+    function validateCustomCode(code) {
+      const banned = /(window|document|globalThis|Function|eval|import|fetch|Worker|XMLHttpRequest)/i;
+      if (banned.test(code)) throw new Error('Disallowed identifier detected');
+      if (code.length > 4000) throw new Error('Code too long');
+    }
+
     const benchFns = {
       sphere: {
         title: "Sphere",
@@ -788,6 +794,7 @@ function f(x) {
       await monacoReady;
       try {
         const code = editor.getValue();
+        validateCustomCode(code);
         const fn = new Function(`${code}; return f;`)();
         if (typeof fn !== 'function') throw new Error('f is not a function');
         customFn = fn;
