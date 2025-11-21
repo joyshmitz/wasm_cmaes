@@ -430,6 +430,7 @@ function f(x) {
     const lineSvg = d3.select('#line');
     const scrub = mustGet('scrub');
     const scrubPlay = mustGet('scrub-play');
+    const playbackState = { frames: [], playing: false, idx: 0 };
     const lineMargin = { top: 10, right: 10, bottom: 30, left: 50 };
     const width = 800, height = 320;
 
@@ -634,14 +635,26 @@ function f(x) {
       surfaceGroup.add(bestSphere);
     }
 
-    function updateEllipse(mean, stds) {
+    function updateEllipse(mean, cov2x2) {
       if (ellipseLine) surfaceGroup.remove(ellipseLine);
-      const rx = stds[0] || 1;
-      const ry = stds[1] || 1;
+      // Eigen decomposition of 2x2 covariance
+      const a = cov2x2[0], b = cov2x2[1], c = cov2x2[3];
+      const trace = a + c;
+      const det = a * c - b * b;
+      const disc = Math.max(trace*trace/4 - det, 0);
+      const l1 = trace/2 + Math.sqrt(disc);
+      const l2 = trace/2 - Math.sqrt(disc);
+      const rx = Math.sqrt(Math.max(l1, 1e-6));
+      const ry = Math.sqrt(Math.max(l2, 1e-6));
+      const angle = Math.atan2(b, l1 - a); // eigenvector for l1
       const pts = [];
       for (let i = 0; i <= 64; i++) {
         const t = (i / 64) * Math.PI * 2;
-        pts.push(new THREE.Vector3(mean.x + rx * Math.cos(t), 0.05, mean.y + ry * Math.sin(t)));
+        const x = rx * Math.cos(t);
+        const y = ry * Math.sin(t);
+        const xr = x * Math.cos(angle) - y * Math.sin(angle);
+        const yr = x * Math.sin(angle) + y * Math.cos(angle);
+        pts.push(new THREE.Vector3(mean.x + xr, 0.05, mean.y + yr));
       }
       const geo = new THREE.BufferGeometry().setFromPoints(pts);
       const mat = new THREE.LineDashedMaterial({ color: 0x38bdf8, dashSize: 0.5, gapSize: 0.3, transparent: true, opacity: 0.8 });
@@ -696,6 +709,9 @@ function f(x) {
       let bestF = Infinity;
       let lastTs = performance.now();
       let iterCounter = 0;
+      playbackState.frames = [];
+      playbackState.idx = 0;
+      scrub.max = 0;
 
       const stepOnce = () => {
         const lambda = es.lambda;
@@ -717,6 +733,14 @@ function f(x) {
         const bestVec = Array.from(res.best_x());
         const proj = projectCandidates(candidates, bestVec, dim);
         render(history, proj.pts, res, proj.b);
+        // Store frame for scrub
+        playbackState.frames.push({
+          pts: proj.pts,
+          mean: { x: res.xmean()[0], y: res.xmean()[1] },
+          cov: [res.stds()[0] ** 2, 0, 0, res.stds()[1] ** 2], // axis-aligned fallback
+          best: proj.b,
+        });
+        scrub.max = playbackState.frames.length - 1;
 
         const delta = history.length > 1 ? history[history.length - 2].best - res.best_f : 0;
         const boost = Math.max(1.0, Math.min(1.25, 1.0 + Math.abs(delta) * 2));
@@ -828,45 +852,12 @@ function f(x) {
         .curve(d3.curveCatmullRom.alpha(0.6));
       linePath.attr('d', lineGen(hist));
 
-      // Scatter bounds adapt to candidates
-      const xs = batch.map((p) => p.x);
-      const ys = batch.map((p) => p.y);
-      const pad = 1.0;
-      scatX.domain([d3.min(xs) - pad, d3.max(xs) + pad]);
-      scatY.domain([d3.min(ys) - pad, d3.max(ys) + pad]);
-      scatterG.select('.axis-x').call(d3.axisBottom(scatX).ticks(6).tickSizeOuter(0));
-      scatterG.select('.axis-y').call(d3.axisLeft(scatY).ticks(6).tickSizeOuter(0));
-
-      const points = cloud.selectAll('circle').data(batch);
-      points.enter()
-        .append('circle')
-        .attr('r', 4)
-        .attr('fill', '#38bdf880')
-        .merge(points)
-        .attr('cx', (d) => scatX(d.x))
-        .attr('cy', (d) => scatY(d.y));
-      points.exit().remove();
-
-      const bx = projBest ? projBest.x : res.best_x()[0];
-      const by = projBest ? projBest.y : res.best_x()[1];
-      bestDot
-        .attr('cx', scatX(bx))
-        .attr('cy', scatY(by));
+      // Update 3D scene
+      updatePoints(batch, projBest || { x: res.best_x()[0], y: res.best_x()[1] });
+      updateEllipse(projBest || { x: res.best_x()[0], y: res.best_x()[1] }, [res.stds()[0]**2,0,0,res.stds()[1]**2]);
 
       bestEl.textContent = `best f = ${res.best_f.toExponential(3)}`;
       iterEl.textContent = `Iter ${hist[hist.length - 1].iter}`;
-
-      // Animate scatter points on update
-      const bestImprovement = hist.length > 1 ? hist[hist.length - 2].best - res.best_f : 0;
-      const colorScale = d3.scaleSequential(d3.interpolateTurbo)
-        .domain([0, Math.max(1e-6, bestImprovement * 50)]);
-
-      cloud.selectAll('circle')
-        .transition()
-        .duration(220)
-        .ease(d3.easeCubicOut)
-        .attr('r', 4.5)
-        .attr('fill', (d, i) => colorScale((i === 0 ? bestImprovement : 0)) || '#38bdf880');
     }
 
     document.getElementById('run').addEventListener('click', run);
