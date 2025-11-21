@@ -224,6 +224,7 @@
           <div class="flex gap-2">
             <button id="story-prev" class="px-3 py-2 rounded-lg bg-slate-800 text-slate-200">Prev</button>
             <button id="story-next" class="px-3 py-2 rounded-lg bg-slate-800 text-slate-200">Next</button>
+            <button id="story-open" class="px-3 py-2 rounded-lg bg-amber-400/80 text-slate-900">Open</button>
           </div>
         </div>
         <div id="story-text" class="text-slate-200 text-sm leading-relaxed">1) Sampling: CMA-ES draws λ candidates from a multivariate normal around the mean.</div>
@@ -375,18 +376,24 @@ function f(x) {
       el.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${path.join('')}</svg>`;
     });
 
-    const benchSelect = document.getElementById('bench');
-    const dimInput = document.getElementById('dim');
-    const dimLabel = document.getElementById('dim-label');
-    const projectionSelect = document.getElementById('projection');
-    const boundsToggle = document.getElementById('bounds-toggle');
-    const boundLo = document.getElementById('bound-lo');
-    const boundHi = document.getElementById('bound-hi');
-    const noiseSamples = document.getElementById('noise-samples');
-    const noiseMax = document.getElementById('noise-max');
-    const noiseAdaptive = document.getElementById('noise-adaptive');
-    const timingEl = document.getElementById('timing');
-    const raceResults = document.getElementById('race-results');
+    const mustGet = (id) => {
+      const el = document.getElementById(id);
+      if (!el) throw new Error(`Missing DOM id: ${id}`);
+      return el;
+    };
+
+    const benchSelect = mustGet('bench');
+    const dimInput = mustGet('dim');
+    const dimLabel = mustGet('dim-label');
+    const projectionSelect = mustGet('projection');
+    const boundsToggle = mustGet('bounds-toggle');
+    const boundLo = mustGet('bound-lo');
+    const boundHi = mustGet('bound-hi');
+    const noiseSamples = mustGet('noise-samples');
+    const noiseMax = mustGet('noise-max');
+    const noiseAdaptive = mustGet('noise-adaptive');
+    const timingEl = mustGet('timing');
+    const raceResults = mustGet('race-results');
 
     const lineSvg = d3.select('#line');
     const scatterSvg = d3.select('#scatter');
@@ -491,8 +498,18 @@ function f(x) {
       };
 
       const { v: v1, lambda: l1 } = powerVec(cov);
+      if (!isFinite(l1) || Math.abs(l1) < 1e-12) {
+        const pts = cands.map((v) => ({ x: v[0], y: v[1] }));
+        const b = { x: bestVec[0], y: bestVec[1] };
+        return { pts, b };
+      }
       const cov2 = cov.map((row, i) => row.map((val, j) => val - l1 * v1[i] * v1[j]));
-      const { v: v2 } = powerVec(cov2);
+      const { v: v2, lambda: l2 } = powerVec(cov2);
+      if (!isFinite(l2) || Math.abs(l2) < 1e-12) {
+        const pts = cands.map((v) => ({ x: v[0], y: v[1] }));
+        const b = { x: bestVec[0], y: bestVec[1] };
+        return { pts, b };
+      }
 
       const project = (vec) => {
         const centered = vec.map((x, i) => x - mean[i]);
@@ -616,10 +633,22 @@ function f(x) {
         const cand = [];
         for (let k=0;k<lambda;k++) {
           const x = sample();
-          const f = bench.f(x);
-          cand.push({x,f});
-          if (f < bestF) { bestF = f; bestX = x; }
-        }
+          let f = bench.f(x);
+          if (boundsToggle.checked) {
+            const lo = Number(boundLo.value) || -5;
+            const hi = Number(boundHi.value) || 5;
+            let penalty = 0;
+            for (let i=0;i<dim;i++) {
+              let xi = x[i];
+              if (xi < lo) { penalty += (lo - xi) ** 2; xi = lo; }
+              else if (xi > hi) { penalty += (xi - hi) ** 2; xi = hi; }
+              x[i] = xi;
+            }
+            f += 1e3 * penalty;
+          }
+        cand.push({x,f});
+        if (f < bestF) { bestF = f; bestX = x; }
+      }
         cand.sort((a,b)=>a.f-b.f);
         const mu = Math.max(1, Math.floor(lambda/4));
         mean = Array(dim).fill(0);
@@ -765,10 +794,14 @@ function f(x) {
     const storyOverlayText = document.getElementById('story-overlay-text');
     const updateStory = () => { storyText.textContent = storySteps[storyIdx]; };
     updateStory();
-    document.getElementById('story-prev').addEventListener('click', () => { storyIdx = (storyIdx - 1 + storySteps.length) % storySteps.length; updateStory(); });
-    document.getElementById('story-next').addEventListener('click', () => { storyIdx = (storyIdx + 1) % storySteps.length; updateStory(); });
-    document.getElementById('story-close').addEventListener('click', () => storyOverlay.classList.add('hidden'));
+    const storyPrev = mustGet('story-prev');
+    const storyNext = mustGet('story-next');
+    const storyClose = mustGet('story-close');
+    storyPrev.addEventListener('click', () => { storyIdx = (storyIdx - 1 + storySteps.length) % storySteps.length; updateStory(); });
+    storyNext.addEventListener('click', () => { storyIdx = (storyIdx + 1) % storySteps.length; updateStory(); });
+    storyClose.addEventListener('click', () => storyOverlay.classList.add('hidden'));
     storyText.addEventListener('click', () => { storyOverlayText.textContent = storySteps[storyIdx]; storyOverlay.classList.remove('hidden'); });
+    document.getElementById('story-open').addEventListener('click', () => { storyOverlayText.textContent = storySteps[storyIdx]; storyOverlay.classList.remove('hidden'); });
 
     // FPS HUD
     let lastFrame = performance.now();
