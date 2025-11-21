@@ -2,10 +2,11 @@
 /target
 /target-par
 
-# wasm-pack outputs
-/pkg
-/pkg-par
-/pkg-*
+# wasm-pack outputs (kept in repo for GitHub Pages)
+# (leave commented if you want to ignore locally)
+# /pkg
+# /pkg-par
+# /pkg-*
 
 # Node / bundler artifacts
 node_modules/
