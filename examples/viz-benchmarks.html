@@ -7,8 +7,7 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
   <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs/loader.js"></script>
+  <script type="module" src="https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs/loader.js"></script>
   <style>
     :root {
       color-scheme: dark;
@@ -196,10 +195,16 @@
         </div>
         <svg id="line" class="chart w-full" viewBox="0 0 800 320"></svg>
         <div class="flex justify-between items-center text-slate-300 text-sm">
-          <span>Candidate scatter (2D slice)</span>
+          <span>3D surface + candidates</span>
           <span id="iter-display">Iter 0</span>
         </div>
-        <svg id="scatter" class="chart w-full" viewBox="0 0 800 360"></svg>
+        <div class="relative">
+          <canvas id="three-canvas" class="w-full h-[380px] rounded-lg"></canvas>
+          <div class="absolute bottom-2 left-2 right-2 flex items-center gap-2 text-xs text-slate-200">
+            <input id="scrub" type="range" min="0" max="0" value="0" class="w-full" />
+            <button id="scrub-play" class="px-2 py-1 rounded bg-slate-800">▶</button>
+          </div>
+        </div>
       </div>
     </section>
 
@@ -256,6 +261,7 @@
   <script type="module">
     import init, { WasmCmaes } from "../pkg/cmaes_wasm.js";
     import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js";
+    import { OrbitControls } from "https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/controls/OrbitControls.js";
 
     // Load lucide icon paths (fallback-safe)
     let lucideIcons = {};
@@ -422,30 +428,20 @@ function f(x) {
     const raceResults = mustGet('race-results');
 
     const lineSvg = d3.select('#line');
-    const scatterSvg = d3.select('#scatter');
+    const scrub = mustGet('scrub');
+    const scrubPlay = mustGet('scrub-play');
     const lineMargin = { top: 10, right: 10, bottom: 30, left: 50 };
-    const scatterMargin = { top: 10, right: 10, bottom: 40, left: 50 };
-
     const width = 800, height = 320;
-    const scatWidth = 800, scatHeight = 360;
 
     const lineG = lineSvg.append('g').attr('transform', `translate(${lineMargin.left},${lineMargin.top})`);
-    const scatterG = scatterSvg.append('g').attr('transform', `translate(${scatterMargin.left},${scatterMargin.top})`);
 
     const lineX = d3.scaleLinear().range([0, width - lineMargin.left - lineMargin.right]);
     const lineY = d3.scaleLog().clamp(true).range([height - lineMargin.top - lineMargin.bottom, 0]);
 
-    const scatX = d3.scaleLinear().range([0, scatWidth - scatterMargin.left - scatterMargin.right]);
-    const scatY = d3.scaleLinear().range([scatHeight - scatterMargin.top - scatterMargin.bottom, 0]);
-
     lineG.append('g').attr('class', 'axis axis-x').attr('transform', `translate(0,${height - lineMargin.top - lineMargin.bottom})`);
     lineG.append('g').attr('class', 'axis axis-y');
-    scatterG.append('g').attr('class', 'axis axis-x').attr('transform', `translate(0,${scatHeight - scatterMargin.top - scatterMargin.bottom})`);
-    scatterG.append('g').attr('class', 'axis axis-y');
 
     const linePath = lineG.append('path').attr('fill', 'none').attr('stroke', '#38bdf8').attr('stroke-width', 2.5);
-    const bestDot = scatterG.append('circle').attr('r', 6).attr('fill', '#fbbf24').attr('stroke', '#0f172a').attr('stroke-width', 2);
-    const cloud = scatterG.append('g').attr('class', 'cloud');
 
     const statusEl = document.getElementById('status');
     const bestEl = document.getElementById('best-display');
@@ -546,6 +542,130 @@ function f(x) {
 
       return { pts: cands.map(project), b: project(bestVec) };
     }
+
+    // Three.js scene
+    const threeCanvas = mustGet('three-canvas');
+    const renderer = new THREE.WebGLRenderer({ canvas: threeCanvas, antialias: true, alpha: true });
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(50, 16/9, 0.1, 500);
+    camera.position.set(0, 40, 70);
+    const controls = new OrbitControls(camera, threeCanvas);
+    controls.enableDamping = true;
+    controls.autoRotate = true;
+    controls.autoRotateSpeed = 0.5;
+    scene.add(new THREE.AmbientLight(0x666666));
+    const dir = new THREE.DirectionalLight(0xffffff, 0.8);
+    dir.position.set(30, 50, 30);
+    scene.add(dir);
+
+    let surfaceMesh = null;
+    const surfaceGroup = new THREE.Group();
+    scene.add(surfaceGroup);
+    let pointsMesh = null;
+    let bestSphere = null;
+    let ellipseLine = null;
+
+    function viridis(t) {
+      // Simple viridis approximation
+      const a = [68, 1, 84], b = [59, 82, 139], c = [33, 145, 140], d = [94, 201, 98], e = [253, 231, 37];
+      const lerp = (p, q, s) => p + (q - p) * s;
+      const x = t;
+      let r, g, b2;
+      if (x < 0.25) { const s = x / 0.25; r = lerp(a[0], b[0], s); g = lerp(a[1], b[1], s); b2 = lerp(a[2], b[2], s); }
+      else if (x < 0.5) { const s = (x-0.25)/0.25; r = lerp(b[0], c[0], s); g = lerp(b[1], c[1], s); b2 = lerp(b[2], c[2], s); }
+      else if (x < 0.75) { const s = (x-0.5)/0.25; r = lerp(c[0], d[0], s); g = lerp(c[1], d[1], s); b2 = lerp(c[2], d[2], s); }
+      else { const s = (x-0.75)/0.25; r = lerp(d[0], e[0], s); g = lerp(d[1], e[1], s); b2 = lerp(d[2], e[2], s); }
+      return (Math.round(r) << 16) | (Math.round(g) << 8) | Math.round(b2);
+    }
+
+    function buildSurfaceGeometry(fn) {
+      const size = 40;
+      const segments = 80;
+      const geom = new THREE.PlaneGeometry(size, size, segments, segments);
+      const pos = geom.attributes.position;
+      let min = Infinity, max = -Infinity;
+      for (let i = 0; i < pos.count; i++) {
+        const x = pos.getX(i);
+        const y = pos.getY(i);
+        const z = fn([x / 2, y / 2]);
+        pos.setZ(i, z);
+        if (z < min) min = z;
+        if (z > max) max = z;
+      }
+      const colors = [];
+      for (let i = 0; i < pos.count; i++) {
+        const z = pos.getZ(i);
+        const t = (z - min) / (max - min + 1e-9);
+        const rgb = viridis(t);
+        colors.push(((rgb >> 16) & 255) / 255, ((rgb >> 8) & 255) / 255, (rgb & 255) / 255);
+      }
+      geom.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+      geom.rotateX(-Math.PI / 2);
+      return geom;
+    }
+
+    function updateSurface(fn) {
+      if (surfaceMesh) surfaceGroup.remove(surfaceMesh);
+      const geom = buildSurfaceGeometry(fn);
+      const mat = new THREE.MeshStandardMaterial({ vertexColors: true, side: THREE.DoubleSide, transparent: true, opacity: 0.9, roughness: 0.6, metalness: 0.0 });
+      surfaceMesh = new THREE.Mesh(geom, mat);
+      surfaceGroup.add(surfaceMesh);
+    }
+
+    function updatePoints(batch, mean) {
+      if (pointsMesh) surfaceGroup.remove(pointsMesh);
+      const geom = new THREE.BufferGeometry();
+      const arr = new Float32Array(batch.length * 3);
+      for (let i = 0; i < batch.length; i++) {
+        arr[i*3] = batch[i].x;
+        arr[i*3+1] = 0.05;
+        arr[i*3+2] = batch[i].y;
+      }
+      geom.setAttribute('position', new THREE.BufferAttribute(arr,3));
+      const mat = new THREE.PointsMaterial({ color: 0x38bdf8, size: 0.6 });
+      pointsMesh = new THREE.Points(geom, mat);
+      surfaceGroup.add(pointsMesh);
+
+      if (bestSphere) surfaceGroup.remove(bestSphere);
+      const sphereGeo = new THREE.SphereGeometry(0.6, 24, 24);
+      const sphereMat = new THREE.MeshStandardMaterial({ color: 0xfbbf24, emissive: 0xf59e0b, emissiveIntensity: 0.6 });
+      bestSphere = new THREE.Mesh(sphereGeo, sphereMat);
+      bestSphere.position.set(mean.x, 0.1, mean.y);
+      surfaceGroup.add(bestSphere);
+    }
+
+    function updateEllipse(mean, stds) {
+      if (ellipseLine) surfaceGroup.remove(ellipseLine);
+      const rx = stds[0] || 1;
+      const ry = stds[1] || 1;
+      const pts = [];
+      for (let i = 0; i <= 64; i++) {
+        const t = (i / 64) * Math.PI * 2;
+        pts.push(new THREE.Vector3(mean.x + rx * Math.cos(t), 0.05, mean.y + ry * Math.sin(t)));
+      }
+      const geo = new THREE.BufferGeometry().setFromPoints(pts);
+      const mat = new THREE.LineDashedMaterial({ color: 0x38bdf8, dashSize: 0.5, gapSize: 0.3, transparent: true, opacity: 0.8 });
+      ellipseLine = new THREE.LineLoop(geo, mat);
+      ellipseLine.computeLineDistances();
+      surfaceGroup.add(ellipseLine);
+    }
+
+    function resizeRenderer() {
+      const w = threeCanvas.clientWidth || 800;
+      const h = 380;
+      renderer.setSize(w, h, false);
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+    }
+    resizeRenderer();
+    window.addEventListener('resize', resizeRenderer);
+
+    function renderThree() {
+      controls.update();
+      renderer.render(scene, camera);
+      requestAnimationFrame(renderThree);
+    }
+    renderThree();
 
     async function run() {
       statusEl.textContent = 'Initializing wasm...';
