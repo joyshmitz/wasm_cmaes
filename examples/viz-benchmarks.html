@@ -741,6 +741,8 @@ function f(x) {
         }
         es.tell_flat(fits);
         const res = es.result();
+        const covArr = Array.from(es.cov_matrix());
+        const cov = [covArr[0], covArr[1], covArr[2], covArr[3]];
         bestF = Math.min(bestF, res.best_f);
         history.push({ iter, best: bestF });
         iterCounter++;
@@ -750,7 +752,8 @@ function f(x) {
         render(history, proj.pts, res, proj.b);
         // Store frame for scrub
         const meanPt = { x: res.xmean()[0], y: res.xmean()[1] };
-        const cov = covFromPoints(proj.pts, meanPt);
+        const covMat = Array.from(es.cov_matrix());
+        const cov = [covMat[0], covMat[1], covMat[2], covMat[3]];
         playbackState.frames.push({
           pts: proj.pts,
           mean: meanPt,
@@ -871,10 +874,9 @@ function f(x) {
         .curve(d3.curveCatmullRom.alpha(0.6));
       linePath.attr('d', lineGen(hist));
 
-      const meanPt = projBest || { x: res.best_x()[0], y: res.best_x()[1] };
-      const cov = covFromPoints(batch, meanPt);
-      updatePoints(batch, meanPt);
-      updateEllipse(meanPt, cov);
+        const meanPt = projBest || { x: res.best_x()[0], y: res.best_x()[1] };
+        updatePoints(batch, meanPt);
+        updateEllipse(meanPt, cov);
 
       bestEl.textContent = `best f = ${res.best_f.toExponential(3)}`;
       iterEl.textContent = `Iter ${hist[hist.length - 1].iter}`;

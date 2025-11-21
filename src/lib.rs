@@ -1812,6 +1812,36 @@ impl WasmCmaes {
         FminResult::new(best_x, best_f, evals_best, evals, iters, xmean, stds)
     }
 
+    /// Current covariance matrix (sigma^2 * C) flattened row-major.
+    /// For sep/lm engines, off-diagonal entries are zero.
+    pub fn cov_matrix(&self) -> Float64Array {
+        let n = self.dim;
+        let mut out = vec![0.0; n * n];
+        match &self.engine {
+            Engine::Full(e) => {
+                let sigma2 = e.sigma * e.sigma;
+                for i in 0..n {
+                    for j in 0..n {
+                        out[idx(n, i, j)] = sigma2 * e.c.data[idx(n, i, j)];
+                    }
+                }
+            }
+            Engine::Sep(e) => {
+                let sigma2 = e.sigma * e.sigma;
+                for i in 0..n {
+                    out[idx(n, i, i)] = sigma2 * e.cov.diag[i];
+                }
+            }
+            Engine::Lm(e) => {
+                let sigma2 = e.sigma * e.sigma;
+                for i in 0..n {
+                    out[idx(n, i, i)] = sigma2 * e.cov.diag[i];
+                }
+            }
+        }
+        Float64Array::from(out.as_slice())
+    }
+
     #[wasm_bindgen(getter)]
     pub fn dimension(&self) -> u32 {
         self.dim as u32

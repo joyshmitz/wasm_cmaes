@@ -70,6 +70,7 @@ export class WasmCmaes {
 
   stop_status(): StopStatus;
   result(): FminResult;
+  cov_matrix(): Float64Array;
 
   /**
    * Serialize the internal CMA-ES state to a JSON-serializable value.
