@@ -280,7 +280,8 @@
       statusEl.textContent = 'Initializing wasm...';
       await init();
 
-      const bench = benchFns[document.getElementById('bench').value];
+      const benchKey = document.getElementById('bench').value;
+      const bench = benchFns[benchKey];
       const lambda = Number(document.getElementById('lambda').value) || 32;
       const sigma = Number(document.getElementById('sigma').value) || 1.2;
       const maxIter = Number(document.getElementById('iters').value) || 250;
@@ -289,6 +290,9 @@
       const opts = { popsize: lambda, seed, maxEvals: lambda * maxIter }; // soft stop
       const x0 = new Float64Array(bench.x0);
       const es = new WasmCmaes(x0, sigma, opts);
+
+      // Rebuild 3D surface to match selected benchmark
+      buildSurface(bench.f);
 
       const history = [];
       let iter = 0;
@@ -315,6 +319,10 @@
           currentBatch.push({ x: candFlat[offset], y: candFlat[offset + 1] });
         }
         render(history, currentBatch, res);
+
+        // Animate best point as a GSAP pulse
+        const bestNode = document.getElementById('best-display');
+        gsap.fromTo(bestNode, { scale: 1 }, { scale: 1.05, duration: 0.25, ease: 'sine.out' });
 
         iter++;
         if (!es.stop_status().stopped && iter < maxIter) {
@@ -428,6 +436,13 @@
 
       bestEl.textContent = `best f = ${res.best_f.toExponential(3)}`;
       iterEl.textContent = `Iter ${hist[hist.length - 1].iter}`;
+
+      // Animate scatter points on update
+      cloud.selectAll('circle')
+        .transition()
+        .duration(200)
+        .ease(d3.easeCubicOut)
+        .attr('r', 4.5);
     }
 
     document.getElementById('run').addEventListener('click', run);
@@ -454,6 +469,42 @@
       renderer.render(scene, camera);
       requestAnimationFrame(animateBg);
     };
+
+    // Optional 3D surface of the current benchmark (preview only, not exact scale)
+    let surface;
+    function buildSurface(fn) {
+      if (surface) scene.remove(surface);
+      const planeSize = 60;
+      const res = 40;
+      const geo = new THREE.PlaneGeometry(planeSize, planeSize, res, res);
+      const positions = geo.attributes.position;
+      for (let i = 0; i < positions.count; i++) {
+        const x = positions.getX(i) / 5; // shrink input
+        const y = positions.getY(i) / 5;
+        const z = -fn([x, y]);
+        positions.setZ(i, z);
+      }
+      positions.needsUpdate = true;
+      geo.computeVertexNormals();
+      const mat = new THREE.MeshStandardMaterial({
+        color: 0x38bdf8,
+        transparent: true,
+        opacity: 0.35,
+        side: THREE.DoubleSide,
+        flatShading: true,
+      });
+      surface = new THREE.Mesh(geo, mat);
+      surface.rotation.x = -Math.PI / 2;
+      scene.add(surface);
+    }
+
+    // Lights for the surface
+    const light1 = new THREE.PointLight(0x38bdf8, 1, 400);
+    light1.position.set(80, 120, 120);
+    scene.add(light1);
+    const light2 = new THREE.PointLight(0x6366f1, 0.7, 400);
+    light2.position.set(-60, 120, -80);
+    scene.add(light2);
 
     const onResize = () => {
       const w = window.innerWidth, h = window.innerHeight;
