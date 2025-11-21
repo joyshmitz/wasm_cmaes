@@ -5,6 +5,8 @@
   <title>CMA-ES Benchmark Gallery</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.min.js"></script>
   <style>
     :root {
       color-scheme: dark;
@@ -57,6 +59,9 @@
   </style>
 </head>
 <body class="min-h-screen">
+  <!-- Three.js background -->
+  <canvas id="bg-canvas" class="fixed inset-0 w-full h-full"></canvas>
+
   <div class="max-w-6xl mx-auto py-10 px-6 space-y-6 relative z-10">
     <header class="flex flex-col gap-3">
       <div class="inline-flex items-center gap-3 bg-sky-500/10 text-sky-200 px-3 py-1 rounded-full w-fit border border-sky-500/20">
@@ -68,20 +73,20 @@
         <p class="text-slate-200 max-w-3xl">Pick a classic test function and watch CMA-ES explore in 2D. Smooth log-loss, animated scatter, live best tracker. Tunable λ, σ, seeds.</p>
       </div>
       <div class="grid sm:grid-cols-3 gap-3">
-        <div class="panel rounded-xl p-3">
-          <p class="text-xs text-slate-400">Bundle</p>
+        <div class="panel rounded-xl p-4 flex flex-col gap-1">
+          <div class="flex items-center gap-2 text-sky-200 text-xs"><span class="lucide" data-icon="cpu"></span>Bundle</div>
           <p class="text-lg font-semibold text-sky-100">Sequential (pkg)</p>
           <p class="text-xs text-slate-400">Swap to parallel by importing pkg-par in the script tag.</p>
         </div>
-        <div class="panel rounded-xl p-3">
-          <p class="text-xs text-slate-400">Rendering</p>
-          <p class="text-lg font-semibold text-amber-200">D3 + Tailwind</p>
-          <p class="text-xs text-slate-400">Log curve + candidate scatter with adaptive scales.</p>
+        <div class="panel rounded-xl p-4 flex flex-col gap-1">
+          <div class="flex items-center gap-2 text-amber-200 text-xs"><span class="lucide" data-icon="activity"></span>Rendering</div>
+          <p class="text-lg font-semibold text-amber-100">D3 + Tailwind + GSAP</p>
+          <p class="text-xs text-slate-400">Log curve, animated scatter, parallax glow.</p>
         </div>
-        <div class="panel rounded-xl p-3">
-          <p class="text-xs text-slate-400">Live status</p>
+        <div class="panel rounded-xl p-4 flex flex-col gap-1">
+          <div class="flex items-center gap-2 text-emerald-200 text-xs"><span class="lucide" data-icon="bar-chart-2"></span>Status</div>
           <p id="status" class="text-lg font-semibold text-emerald-200">Idle</p>
-          <p class="text-xs text-slate-400">Tracks iterations/evals on the fly.</p>
+          <p class="text-xs text-slate-400">Tracks iterations/evals in real time.</p>
         </div>
       </div>
     </header>
@@ -134,7 +139,7 @@
         </div>
       </div>
 
-      <div class="panel rounded-xl p-5 col-span-2 space-y-4">
+      <div class="panel rounded-xl p-5 col-span-2 space-y-4 overflow-hidden">
         <div class="flex justify-between items-center text-slate-300 text-sm">
           <span>Best f(t)</span>
           <span id="best-display">–</span>
@@ -151,6 +156,7 @@
 
   <script type="module">
     import init, { WasmCmaes } from "../pkg/cmaes_wasm.js";
+    import lucideIcons from "https://unpkg.com/lucide-static@0.321.0/icons.json" assert { type: "json" };
 
     const benchFns = {
       sphere: {
@@ -231,6 +237,14 @@
         x0: [-12, 2.5],
       },
     };
+
+    // Inject lucide icons
+    document.querySelectorAll('.lucide').forEach((el) => {
+      const name = el.dataset.icon;
+      const path = lucideIcons[name];
+      if (!path) return;
+      el.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${path.join('')}</svg>`;
+    });
 
     const lineSvg = d3.select('#line');
     const scatterSvg = d3.select('#scatter');
@@ -418,6 +432,43 @@
 
     document.getElementById('run').addEventListener('click', run);
     document.getElementById('run-js').addEventListener('click', runJsBaseline);
+
+    // Background Three.js particles
+    const canvas = document.getElementById('bg-canvas');
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1, 1000);
+    camera.position.z = 200;
+    const geometry = new THREE.BufferGeometry();
+    const COUNT = 800;
+    const positions = new Float32Array(COUNT * 3);
+    for (let i = 0; i < COUNT * 3; i++) positions[i] = (Math.random() - 0.5) * 400;
+    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    const material = new THREE.PointsMaterial({ color: 0x38bdf8, size: 1.6, transparent: true, opacity: 0.6 });
+    const points = new THREE.Points(geometry, material);
+    scene.add(points);
+
+    const animateBg = () => {
+      points.rotation.y += 0.0008;
+      points.rotation.x += 0.0004;
+      renderer.render(scene, camera);
+      requestAnimationFrame(animateBg);
+    };
+
+    const onResize = () => {
+      const w = window.innerWidth, h = window.innerHeight;
+      renderer.setSize(w, h);
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+    };
+    window.addEventListener('resize', onResize);
+    onResize();
+    animateBg();
+
+    // Subtle GSAP float on panels
+    gsap.utils.toArray('.panel').forEach((el, i) => {
+      gsap.to(el, { y: '+=6', duration: 3 + i * 0.2, repeat: -1, yoyo: true, ease: 'sine.inOut', delay: i * 0.1 });
+    });
   </script>
 </body>
 </html>
