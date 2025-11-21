@@ -7,6 +7,7 @@
   <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
   <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs/loader.js"></script>
   <style>
     :root {
       color-scheme: dark;
@@ -127,6 +128,54 @@
             <input id="seed" type="number" value="42" min="0" class="w-full rounded-lg bg-slate-900 border border-slate-700 px-3 py-2 text-slate-100" />
           </div>
         </div>
+        <div class="grid grid-cols-2 gap-3 items-center">
+          <div>
+            <label class="block text-sm text-slate-400">Dimension</label>
+            <input id="dim" type="range" value="2" min="2" max="8" class="w-full" />
+          </div>
+          <div class="text-sm text-slate-300" id="dim-label">2D (scatter uses native axes)</div>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-sm text-slate-400">Projection</label>
+            <select id="projection" class="w-full rounded-lg bg-slate-900 border border-slate-700 px-3 py-2 text-slate-100">
+              <option value="auto">Auto (PCA if dim>2)</option>
+              <option value="first2">First 2 dims</option>
+              <option value="pca">PCA (top-2)</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm text-slate-400">Race mode</label>
+            <button id="run-race" class="w-full bg-fuchsia-500 hover:bg-fuchsia-400 text-slate-900 font-semibold px-3 py-2 rounded-lg transition">Run WASM vs JS</button>
+          </div>
+        </div>
+        <div class="space-y-2">
+          <label class="block text-sm text-slate-400 flex items-center gap-2">
+            <input id="bounds-toggle" type="checkbox" class="accent-sky-400" /> Enable bounds
+          </label>
+          <div class="grid grid-cols-2 gap-3">
+            <input id="bound-lo" type="number" value="-5" step="0.5" class="rounded-lg bg-slate-900 border border-slate-700 px-3 py-2 text-slate-100" />
+            <input id="bound-hi" type="number" value="5" step="0.5" class="rounded-lg bg-slate-900 border border-slate-700 px-3 py-2 text-slate-100" />
+          </div>
+        </div>
+        <div class="space-y-2">
+          <label class="block text-sm text-slate-400">Noise model</label>
+          <div class="grid grid-cols-3 gap-2 text-sm text-slate-200">
+            <div class="space-y-1">
+              <span class="text-xs text-slate-400">Samples/pt</span>
+              <input id="noise-samples" type="number" value="1" min="1" max="16" class="w-full rounded-lg bg-slate-900 border border-slate-700 px-2 py-1" />
+            </div>
+            <div class="space-y-1">
+              <span class="text-xs text-slate-400">Max samples</span>
+              <input id="noise-max" type="number" value="8" min="1" max="32" class="w-full rounded-lg bg-slate-900 border border-slate-700 px-2 py-1" />
+            </div>
+            <div class="space-y-1">
+              <label class="flex items-center gap-2 text-xs text-slate-400">
+                <input id="noise-adaptive" type="checkbox" class="accent-sky-400" /> Adaptive
+              </label>
+            </div>
+          </div>
+        </div>
         <div class="flex flex-wrap items-center gap-3">
           <button id="run" class="glow bg-sky-500 hover:bg-sky-400 text-slate-900 font-semibold px-4 py-2 rounded-lg transition">Run (WASM CMA-ES)</button>
           <button id="run-js" class="bg-amber-400/90 hover:bg-amber-300 text-slate-900 font-semibold px-4 py-2 rounded-lg transition">Run baseline (JS)</button>
@@ -152,11 +201,86 @@
         <svg id="scatter" class="chart w-full" viewBox="0 0 800 360"></svg>
       </div>
     </section>
+
+    <section class="grid lg:grid-cols-2 gap-4">
+      <div class="panel rounded-xl p-5 space-y-3">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-xs text-slate-400">Custom objective</p>
+            <h3 class="text-lg text-sky-100 font-semibold">Write your own f(x)</h3>
+          </div>
+          <button id="apply-custom" class="bg-emerald-400/90 hover:bg-emerald-300 text-slate-900 font-semibold px-3 py-2 rounded-lg transition">Use in WASM</button>
+        </div>
+        <div class="text-xs text-slate-400">Function signature: <code>f(x: number[]): number</code>. Keep it deterministic for fair races.</div>
+        <div id="editor" class="w-full h-56 rounded-lg overflow-hidden border border-slate-700 bg-slate-900"></div>
+      </div>
+
+      <div class="panel rounded-xl p-5 space-y-4">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-xs text-slate-400">Story mode</p>
+            <h3 class="text-lg text-amber-100 font-semibold">Guided CMA-ES</h3>
+          </div>
+          <div class="flex gap-2">
+            <button id="story-prev" class="px-3 py-2 rounded-lg bg-slate-800 text-slate-200">Prev</button>
+            <button id="story-next" class="px-3 py-2 rounded-lg bg-slate-800 text-slate-200">Next</button>
+          </div>
+        </div>
+        <div id="story-text" class="text-slate-200 text-sm leading-relaxed">1) Sampling: CMA-ES draws λ candidates from a multivariate normal around the mean.</div>
+      </div>
+    </section>
+  </div>
+
+  <div id="hud" class="fixed top-4 right-4 panel rounded-xl p-3 text-xs text-slate-200 space-y-1 min-w-[220px]">
+    <div class="flex justify-between"><span>FPS</span><span id="hud-fps">–</span></div>
+    <div class="flex justify-between"><span>WASM last run</span><span id="hud-wasm">–</span></div>
+    <div class="flex justify-between"><span>JS baseline</span><span id="hud-js">–</span></div>
+    <div class="flex justify-between"><span>Iter/sec (viz)</span><span id="hud-iter">–</span></div>
+  </div>
+
+  <div id="race-results" class="fixed bottom-4 right-4 panel rounded-xl p-3 text-xs text-slate-200 space-y-1 min-w-[260px]"></div>
+
+  <div id="story-overlay" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-20 items-center justify-center">
+    <div class="panel rounded-xl p-6 max-w-xl space-y-3 text-slate-100">
+      <h3 class="text-xl font-semibold">CMA-ES story</h3>
+      <p id="story-overlay-text" class="text-sm"></p>
+      <div class="flex justify-end gap-2">
+        <button id="story-close" class="px-3 py-2 rounded-lg bg-slate-800 text-slate-200">Close</button>
+      </div>
+    </div>
+  </div>
   </div>
 
   <script type="module">
     import init, { WasmCmaes } from "../pkg/cmaes_wasm.js";
     import lucideIcons from "https://unpkg.com/lucide-static@0.321.0/icons.json" assert { type: "json" };
+
+    // Monaco editor setup
+    const defaultCustomCode = `// Return a scalar fitness; lower is better
+function f(x) {
+  // Example: shifted bowl
+  const cx = 1.5, cy = -2.0;
+  const dx = x[0] - cx;
+  const dy = x[1] - cy;
+  return dx*dx + dy*dy + 0.1*Math.sin(3*dx) + 0.1*Math.cos(3*dy);
+}`;
+    let editor;
+    const monacoReady = new Promise((resolve) => {
+      window.require.config({ paths: { vs: "https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs" } });
+      window.require(["vs/editor/editor.main"], () => {
+        editor = monaco.editor.create(document.getElementById("editor"), {
+          value: defaultCustomCode,
+          language: "javascript",
+          theme: "vs-dark",
+          fontSize: 13,
+          minimap: { enabled: false },
+          automaticLayout: true,
+        });
+        resolve(editor);
+      });
+    });
+
+    let customFn = (x) => x.reduce((s, v) => s + v * v, 0);
 
     const benchFns = {
       sphere: {
@@ -236,6 +360,11 @@
         },
         x0: [-12, 2.5],
       },
+      custom: {
+        title: "Custom",
+        f: (x) => customFn(x),
+        x0: [0, 0],
+      },
     };
 
     // Inject lucide icons
@@ -245,6 +374,19 @@
       if (!path) return;
       el.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${path.join('')}</svg>`;
     });
+
+    const benchSelect = document.getElementById('bench');
+    const dimInput = document.getElementById('dim');
+    const dimLabel = document.getElementById('dim-label');
+    const projectionSelect = document.getElementById('projection');
+    const boundsToggle = document.getElementById('bounds-toggle');
+    const boundLo = document.getElementById('bound-lo');
+    const boundHi = document.getElementById('bound-hi');
+    const noiseSamples = document.getElementById('noise-samples');
+    const noiseMax = document.getElementById('noise-max');
+    const noiseAdaptive = document.getElementById('noise-adaptive');
+    const timingEl = document.getElementById('timing');
+    const raceResults = document.getElementById('race-results');
 
     const lineSvg = d3.select('#line');
     const scatterSvg = d3.select('#scatter');
@@ -275,62 +417,161 @@
     const statusEl = document.getElementById('status');
     const bestEl = document.getElementById('best-display');
     const iterEl = document.getElementById('iter-display');
+    const hudFps = document.getElementById('hud-fps');
+    const hudWasm = document.getElementById('hud-wasm');
+    const hudJs = document.getElementById('hud-js');
+    const hudIter = document.getElementById('hud-iter');
+
+    let wasmInitialized = false;
+
+    function currentDim(benchKey) {
+      let d = Number(dimInput.value) || 2;
+      if (benchKey === 'bukin6') {
+        d = 2;
+        dimInput.value = 2;
+        dimLabel.textContent = '2D required for Bukin N.6';
+      }
+      return d;
+    }
+
+    function buildOptions(lambda, maxIter, seed, dim) {
+      const opts = { popsize: lambda, seed, maxEvals: lambda * maxIter };
+      if (boundsToggle.checked) {
+        const lo = Number(boundLo.value) || -5;
+        const hi = Number(boundHi.value) || 5;
+        opts.bounds = {
+          lower: new Float64Array(Array(dim).fill(lo)),
+          upper: new Float64Array(Array(dim).fill(hi)),
+        };
+      }
+      const samples = Number(noiseSamples.value) || 1;
+      const maxS = Number(noiseMax.value) || 8;
+      opts.noise = {
+        samplesPerPoint: samples,
+        maxSamplesPerPoint: maxS,
+        adaptive: noiseAdaptive.checked,
+      };
+      return opts;
+    }
+
+    function projectCandidates(cands, bestVec, dim) {
+      const mode = projectionSelect.value === 'auto' ? (dim > 2 ? 'pca' : 'first2') : projectionSelect.value;
+      if (dim <= 2 || mode === 'first2') {
+        const pts = cands.map((v) => ({ x: v[0], y: v[1] }));
+        const b = { x: bestVec[0], y: bestVec[1] };
+        return { pts, b };
+      }
+      const mean = Array(dim).fill(0);
+      cands.forEach((v) => v.forEach((val, i) => { mean[i] += val; }));
+      mean.forEach((_, i) => { mean[i] /= cands.length; });
+      const cov = Array.from({ length: dim }, () => Array(dim).fill(0));
+      cands.forEach((v) => {
+        for (let i = 0; i < dim; i++) {
+          const a = v[i] - mean[i];
+          for (let j = 0; j < dim; j++) cov[i][j] += a * (v[j] - mean[j]);
+        }
+      });
+      const denom = Math.max(1, cands.length - 1);
+      for (let i = 0; i < dim; i++) for (let j = 0; j < dim; j++) cov[i][j] /= denom;
+
+      const powerVec = (M) => {
+        let v = Array.from({ length: dim }, () => Math.random());
+        const norm = (arr) => Math.sqrt(arr.reduce((s, x) => s + x * x, 0));
+        for (let it = 0; it < 25; it++) {
+          const nv = Array(dim).fill(0);
+          for (let i = 0; i < dim; i++) {
+            for (let j = 0; j < dim; j++) nv[i] += M[i][j] * v[j];
+          }
+          const n = norm(nv) || 1;
+          v = nv.map((x) => x / n);
+        }
+        let lambda = 0;
+        for (let i = 0; i < dim; i++) for (let j = 0; j < dim; j++) lambda += v[i] * M[i][j] * v[j];
+        return { v, lambda };
+      };
+
+      const { v: v1, lambda: l1 } = powerVec(cov);
+      const cov2 = cov.map((row, i) => row.map((val, j) => val - l1 * v1[i] * v1[j]));
+      const { v: v2 } = powerVec(cov2);
+
+      const project = (vec) => {
+        const centered = vec.map((x, i) => x - mean[i]);
+        const px = centered.reduce((s, x, i) => s + x * v1[i], 0);
+        const py = centered.reduce((s, x, i) => s + x * v2[i], 0);
+        return { x: px, y: py };
+      };
+
+      return { pts: cands.map(project), b: project(bestVec) };
+    }
 
     async function run() {
       statusEl.textContent = 'Initializing wasm...';
-      await init();
+      if (!wasmInitialized) {
+        await init();
+        wasmInitialized = true;
+      }
 
-      const benchKey = document.getElementById('bench').value;
+      const benchKey = benchSelect.value;
       const bench = benchFns[benchKey];
       const lambda = Number(document.getElementById('lambda').value) || 32;
       const sigma = Number(document.getElementById('sigma').value) || 1.2;
       const maxIter = Number(document.getElementById('iters').value) || 250;
       const seed = Number(document.getElementById('seed').value) || 42;
+      const dim = currentDim(benchKey);
+      dimLabel.textContent = `${dim}D (${projectionSelect.value === 'pca' ? 'PCA' : 'slice'} for scatter)`;
 
-      const opts = { popsize: lambda, seed, maxEvals: lambda * maxIter }; // soft stop
-      const x0 = new Float64Array(bench.x0);
+      const opts = buildOptions(lambda, maxIter, seed, dim);
+
+      const x0 = new Float64Array(dim);
+      for (let i = 0; i < dim; i++) x0[i] = bench.x0[i % bench.x0.length] || 0;
       const es = new WasmCmaes(x0, sigma, opts);
 
-      // Rebuild 3D surface to match selected benchmark
       buildSurface(bench.f);
 
       const history = [];
       let iter = 0;
       let bestF = Infinity;
+      let lastTs = performance.now();
+      let iterCounter = 0;
 
       const stepOnce = () => {
-        const dim = 2;
         const lambda = es.lambda;
         const candFlat = es.ask_flat();
         const fits = new Float64Array(lambda);
+        const candidates = [];
         for (let k = 0; k < lambda; k++) {
           const offset = k * dim;
-          const v = [candFlat[offset], candFlat[offset + 1]];
+          const v = candFlat.slice(offset, offset + dim);
+          candidates.push(Array.from(v));
           fits[k] = bench.f(v);
         }
         es.tell_flat(fits);
         const res = es.result();
         bestF = Math.min(bestF, res.best_f);
         history.push({ iter, best: bestF });
+        iterCounter++;
 
-        const currentBatch = [];
-        for (let k = 0; k < lambda; k++) {
-          const offset = k * dim;
-          currentBatch.push({ x: candFlat[offset], y: candFlat[offset + 1] });
-        }
-        render(history, currentBatch, res);
+        const bestVec = Array.from(res.best_x());
+        const proj = projectCandidates(candidates, bestVec, dim);
+        render(history, proj.pts, res, proj.b);
 
-        // Animate best point as a GSAP pulse proportional to improvement
-        const bestNode = document.getElementById('best-display');
         const delta = history.length > 1 ? history[history.length - 2].best - res.best_f : 0;
         const boost = Math.max(1.0, Math.min(1.25, 1.0 + Math.abs(delta) * 2));
-        gsap.fromTo(bestNode, { scale: 1 }, { scale: boost, duration: 0.35, ease: 'sine.out' });
+        gsap.fromTo(bestEl, { scale: 1 }, { scale: boost, duration: 0.35, ease: 'sine.out' });
 
         iter++;
+        const now = performance.now();
+        if (now - lastTs > 1000) {
+          document.getElementById('hud-iter').textContent = `${iterCounter} iter/s`;
+          iterCounter = 0;
+          lastTs = now;
+        }
+
         if (!es.stop_status().stopped && iter < maxIter) {
           requestAnimationFrame(stepOnce);
         } else {
           statusEl.textContent = `Done in ${iter} iterations / ${res.evals} evals`;
+          document.getElementById('hud-wasm').textContent = `${res.evals} evals`;
         }
       };
 
@@ -338,28 +579,25 @@
       requestAnimationFrame(stepOnce);
     }
 
-    function runJsBaseline() {
-      const bench = benchFns[document.getElementById('bench').value];
+    function runJsBaseline(dimOverride) {
+      const bench = benchFns[benchSelect.value];
       const lambda = Number(document.getElementById('lambda').value) || 32;
       const sigma0 = Number(document.getElementById('sigma').value) || 1.2;
       const maxIter = Number(document.getElementById('iters').value) || 250;
       const seed = Number(document.getElementById('seed').value) || 42;
+      const dim = dimOverride || 2;
 
       const rng = (() => {
         let state = BigInt(seed || 1);
         return () => {
-          // simple LCG
           state = (6364136223846793005n * state + 1n) & ((1n << 64n) - 1n);
-          return Number(state >> 11n) / 9007199254740992; // 53-bit fraction
+          return Number(state >> 11n) / 9007199254740992;
         };
       })();
 
-      const dim = 2;
-      let mean = bench.x0.slice();
+      let mean = Array.from({ length: dim }, (_, i) => bench.x0[i % bench.x0.length] || 0);
       let sigma = sigma0;
-      let cov = [ [1,0], [0,1] ];
       const sample = () => {
-        // Box-Muller
         const z = [];
         for (let i=0;i<dim;i++) {
           const u1 = Math.max(1e-12, 1 - rng());
@@ -368,8 +606,7 @@
           const th = 2*Math.PI*u2;
           z.push(r*Math.cos(th));
         }
-        // apply diagonal sigma only (naive)
-        return [ mean[0] + sigma * z[0], mean[1] + sigma * z[1] ];
+        return z.map((zi, i) => mean[i] + sigma * zi);
       };
 
       let bestF = Infinity;
@@ -385,19 +622,21 @@
         }
         cand.sort((a,b)=>a.f-b.f);
         const mu = Math.max(1, Math.floor(lambda/4));
-        mean = [0,0];
+        mean = Array(dim).fill(0);
         for (let i=0;i<mu;i++) {
-          mean[0] += cand[i].x[0];
-          mean[1] += cand[i].x[1];
+          for (let d=0; d<dim; d++) mean[d] += cand[i].x[d];
         }
-        mean[0] /= mu; mean[1] /= mu;
-        sigma *= 0.99; // simple anneal
+        for (let d=0; d<dim; d++) mean[d] /= mu;
+        sigma *= 0.99;
       }
       const t1 = performance.now();
-      timing.textContent = `Baseline JS: best f=${bestF.toExponential(3)} at [${bestX.map(v=>v.toFixed(3)).join(', ')}] in ${(t1-t0).toFixed(1)} ms`;
+      const msg = `Baseline JS: best f=${bestF.toExponential(3)} in ${(t1-t0).toFixed(1)} ms`;
+      timingEl.textContent = msg;
+      hudJs.textContent = msg;
+      return { bestF, ms: (t1-t0), bestX };
     }
 
-    function render(hist, batch, res) {
+    function render(hist, batch, res, projBest) {
       if (!hist.length) return;
       const xDomain = [0, d3.max(hist, (d) => d.iter) + 1];
       const yDomain = [Math.min(...hist.map((d) => d.best), 1e-6), d3.max(hist, (d) => d.best)];
@@ -432,9 +671,11 @@
         .attr('cy', (d) => scatY(d.y));
       points.exit().remove();
 
+      const bx = projBest ? projBest.x : res.best_x()[0];
+      const by = projBest ? projBest.y : res.best_x()[1];
       bestDot
-        .attr('cx', scatX(res.best_x()[0]))
-        .attr('cy', scatY(res.best_x()[1]));
+        .attr('cx', scatX(bx))
+        .attr('cy', scatY(by));
 
       bestEl.textContent = `best f = ${res.best_f.toExponential(3)}`;
       iterEl.textContent = `Iter ${hist[hist.length - 1].iter}`;
@@ -453,7 +694,95 @@
     }
 
     document.getElementById('run').addEventListener('click', run);
-    document.getElementById('run-js').addEventListener('click', runJsBaseline);
+    document.getElementById('run-js').addEventListener('click', () => runJsBaseline());
+    document.getElementById('run-race').addEventListener('click', async () => {
+      statusEl.textContent = 'Race: running WASM...';
+      const benchKey = benchSelect.value;
+      const bench = benchFns[benchKey];
+      const lambda = Number(document.getElementById('lambda').value) || 32;
+      const sigma = Number(document.getElementById('sigma').value) || 1.2;
+      const maxIter = Number(document.getElementById('iters').value) || 250;
+      const seed = Number(document.getElementById('seed').value) || 42;
+      const dim = currentDim(benchKey);
+      const opts = buildOptions(lambda, maxIter, seed, dim);
+      if (!wasmInitialized) { await init(); wasmInitialized = true; }
+      const x0 = new Float64Array(dim);
+      for (let i = 0; i < dim; i++) x0[i] = bench.x0[i % bench.x0.length] || 0;
+      const es = new WasmCmaes(x0, sigma, opts);
+      const t0 = performance.now();
+      while (!es.stop_status().stopped) {
+        const candFlat = es.ask_flat();
+        const fits = new Float64Array(es.lambda);
+        for (let k = 0; k < es.lambda; k++) {
+          const offset = k * dim;
+          fits[k] = bench.f(candFlat.slice(offset, offset + dim));
+        }
+        es.tell_flat(fits);
+        if (es.evals >= opts.maxEvals) break;
+      }
+      const wasmMs = performance.now() - t0;
+      const wasmRes = es.result();
+      hudWasm.textContent = `${wasmRes.evals} evals, ${wasmMs.toFixed(1)} ms`;
+
+      statusEl.textContent = 'Race: running JS baseline...';
+      const jsRes = runJsBaseline(dim);
+      raceResults.innerHTML = `<div class="font-semibold">Race results</div>
+        <div>WASM: f=${wasmRes.best_f.toExponential(3)}, ${wasmMs.toFixed(1)} ms</div>
+        <div>JS: f=${jsRes.bestF.toExponential(3)}, ${jsRes.ms.toFixed(1)} ms</div>`;
+      statusEl.textContent = 'Race complete';
+    });
+
+    dimInput.addEventListener('input', () => {
+      dimLabel.textContent = `${dimInput.value}D (${projectionSelect.value === 'pca' ? 'PCA' : 'slice'})`;
+    });
+
+    document.getElementById('apply-custom').addEventListener('click', async () => {
+      await monacoReady;
+      try {
+        const code = editor.getValue();
+        const fn = new Function(`${code}; return f;`)();
+        if (typeof fn !== 'function') throw new Error('f is not a function');
+        customFn = fn;
+        benchSelect.value = 'custom';
+        statusEl.textContent = 'Custom objective applied';
+      } catch (e) {
+        alert('Invalid function: ' + e.message);
+      }
+    });
+
+    // Story mode
+    const storySteps = [
+      'Sampling: CMA-ES draws λ candidates from a multivariate normal around the mean.',
+      'Selection: rank candidates, take top μ with log weights.',
+      'Adaptation: update mean, covariance (full/sep/lm), and step size σ.',
+      'Stop: ftarget, max evals, TolFun/TolX, or ill-conditioned covariance.',
+      'Restarts: optional IPOP/BIPOP strategies to escape local minima.'
+    ];
+    let storyIdx = 0;
+    const storyText = document.getElementById('story-text');
+    const storyOverlay = document.getElementById('story-overlay');
+    const storyOverlayText = document.getElementById('story-overlay-text');
+    const updateStory = () => { storyText.textContent = storySteps[storyIdx]; };
+    updateStory();
+    document.getElementById('story-prev').addEventListener('click', () => { storyIdx = (storyIdx - 1 + storySteps.length) % storySteps.length; updateStory(); });
+    document.getElementById('story-next').addEventListener('click', () => { storyIdx = (storyIdx + 1) % storySteps.length; updateStory(); });
+    document.getElementById('story-close').addEventListener('click', () => storyOverlay.classList.add('hidden'));
+    storyText.addEventListener('click', () => { storyOverlayText.textContent = storySteps[storyIdx]; storyOverlay.classList.remove('hidden'); });
+
+    // FPS HUD
+    let lastFrame = performance.now();
+    let frames = 0;
+    const tick = () => {
+      frames++;
+      const now = performance.now();
+      if (now - lastFrame > 1000) {
+        hudFps.textContent = `${frames} fps`;
+        frames = 0;
+        lastFrame = now;
+      }
+      requestAnimationFrame(tick);
+    };
+    tick();
 
     // Background Three.js particles
     const canvas = document.getElementById('bg-canvas');
