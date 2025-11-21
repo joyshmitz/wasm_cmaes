@@ -639,9 +639,10 @@ function f(x) {
     function render(hist, batch, res, projBest) {
       if (!hist.length) return;
       const xDomain = [0, d3.max(hist, (d) => d.iter) + 1];
-      const yDomain = [Math.min(...hist.map((d) => d.best), 1e-6), d3.max(hist, (d) => d.best)];
+      const yMin = Math.max(1e-9, Math.min(...hist.map((d) => d.best)));
+      const yMax = d3.max(hist, (d) => d.best) || 1;
       lineX.domain(xDomain);
-      lineY.domain([Math.max(yDomain[0], 1e-6), yDomain[1]]);
+      lineY.domain([yMin, yMax]);
 
       lineG.select('.axis-x').call(d3.axisBottom(lineX).ticks(8).tickSizeOuter(0));
       lineG.select('.axis-y').call(d3.axisLeft(lineY).ticks(6, "~g"));
