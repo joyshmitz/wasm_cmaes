@@ -1384,7 +1384,6 @@
       showToast(resultMsg, 'success', 5000);
       updateChips();
     });
-}
 
     const playLoop = () => {
       if (!playbackState.playing || playbackState.frames.length === 0) return;
@@ -1501,8 +1500,8 @@
     });
 
     // Mobile run button uses the same run pipeline then closes the sheet
-    var runMobileBtn = document.getElementById('run-mobile');
-    if (runMobileBtn) runMobileBtn.addEventListener('click', () => {
+    var mobileRunButton = document.getElementById('run-mobile');
+    if (mobileRunButton) mobileRunButton.addEventListener('click', () => {
       run();
       // If we want to close the pane on run:
       // window.pane?.destroy({animate: true}); // No, we want to hide/lower it.
