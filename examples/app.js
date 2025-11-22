@@ -342,6 +342,7 @@ function f(x) {
     const noiseSamples = mustGet('noise-samples');
     const noiseMax = mustGet('noise-max');
     const noiseAdaptive = mustGet('noise-adaptive');
+    const noisyToggle = mustGet('noisy-toggle');
     const timingEl = mustGet('timing');
     const raceResults = mustGet('race-results');
     const lambdaInput = mustGet('lambda');
@@ -453,6 +454,11 @@ function f(x) {
         maxSamplesPerPoint: maxS,
         adaptive: noiseAdaptive.checked,
       };
+      if (noisyToggle.checked) {
+        opts.noise.samplesPerPoint = Math.max(opts.noise.samplesPerPoint, 3);
+        opts.noise.maxSamplesPerPoint = Math.max(opts.noise.maxSamplesPerPoint, 9);
+        opts.noise.adaptive = true;
+      }
       return opts;
     }
 
@@ -467,6 +473,7 @@ function f(x) {
       lo: getMobileEl('bound-lo'),
       hi: getMobileEl('bound-hi'),
       covar: getMobileEl('covar-model'),
+      noisy: document.getElementById('noisy-toggle-mobile'),
     };
 
     const loadRecentPresets = () => {
@@ -1489,6 +1496,7 @@ function f(x) {
         cond,
         model: metadata?.model || covarModelSelect.value,
         evals: metadata?.evals || null,
+        noisy: metadata?.noisy || noisyToggle.checked,
       };
     }
 
@@ -1505,6 +1513,7 @@ function f(x) {
         lo: overrides.lo ?? boundLo.value,
         hi: overrides.hi ?? boundHi.value
       });
+      if (noisyToggle.checked) params.set('noisy', 'true');
       return `${window.location.origin}${window.location.pathname}?${params.toString()}`;
     }
 
@@ -1551,6 +1560,11 @@ function f(x) {
       if (params.has('bounds')) boundsToggle.checked = params.get('bounds') === 'true';
       if (params.has('lo')) boundLo.value = params.get('lo');
       if (params.has('hi')) boundHi.value = params.get('hi');
+      if (params.has('noisy')) {
+        const isNoisy = params.get('noisy') === 'true';
+        noisyToggle.checked = isNoisy;
+        if (mobileRefs.noisy) mobileRefs.noisy.checked = isNoisy;
+      }
 
       // Mirror to mobile controls if present
       if (mobileRefs.bench) mobileRefs.bench.value = benchSelect.value;
@@ -1580,7 +1594,8 @@ function f(x) {
           `mean ${run.summary.mean.toExponential(3)}`,
           `median ${run.summary.median.toExponential(3)}`,
           `std ${run.summary.std.toExponential(3)}`,
-          `model ${run.summary.model || 'auto'}`
+          `model ${run.summary.model || 'auto'}`,
+          run.summary.noisy ? 'noisy' : 'clean'
         ];
         return parts.join(' | ');
       };
@@ -1614,7 +1629,7 @@ function f(x) {
         swatch.style.backgroundColor = run.color;
         swatch.className = 'w-3 h-3 rounded-full inline-block';
         const text = document.createElement('span');
-        text.textContent = `${run.label} (${run.summary.best.toExponential(3)}) [${run.summary.model || 'auto'}]`;
+        text.textContent = `${run.label} (${run.summary.best.toExponential(3)}) [${run.summary.model || 'auto'}${run.summary.noisy ? ', noisy' : ''}]`;
         pill.append(swatch, text);
         comparisonLegend.appendChild(pill);
       });
@@ -1753,6 +1768,7 @@ function f(x) {
         model: covarModelSelect.value,
         stds: res?.stds ? Array.from(res.stds()) : undefined,
         evals: res?.evals,
+        noisy: noisyToggle.checked,
       };
       const summary = summarizeRun(hist, resMeta, res?.best_f);
       const record = {
@@ -1888,6 +1904,8 @@ function f(x) {
     renderPresetGallery(true);
     renderRecentPresets();
     renderRecentPresets(true);
+    renderQuickstart();
+    renderGlossary();
 
     // Add event listeners to export buttons if they exist
     exportCsvBtn.addEventListener('click', exportCSV);

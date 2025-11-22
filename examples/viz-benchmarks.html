@@ -725,6 +725,11 @@
               </label>
             </div>
           </div>
+          <label class="flex items-center gap-2 text-sm font-medium text-amber-200 mt-2">
+            <input id="noisy-toggle" type="checkbox" class="accent-amber-400 w-4 h-4" />
+            Noisy objective (robust sampling)
+          </label>
+          <p class="text-xs text-slate-400">Turns on adaptive multi-sampling (3–9 samples) for noisy benchmarks.</p>
         </div>
 
         <!-- Action buttons -->
@@ -940,6 +945,13 @@
               <input id="sigma-mobile" type="number" value="1.2" step="0.1"
                      class="w-full rounded-lg bg-slate-900 border border-slate-700 px-3 py-2 text-slate-100" />
             </div>
+          </div>
+
+          <div class="space-y-2">
+            <label class="flex items-center gap-2 text-sm font-medium text-amber-200">
+              <input id="noisy-toggle-mobile" type="checkbox" class="accent-amber-400 w-4 h-4" />
+              Noisy objective (robust sampling)
+            </label>
           </div>
 
           <div class="grid grid-cols-2 gap-3">
