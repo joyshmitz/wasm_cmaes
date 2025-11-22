@@ -765,11 +765,9 @@ function f(x) {
 
         const bestVec = Array.from(res.best_x());
         const proj = projectCandidates(candidates, bestVec, dim);
-        render(history, proj.pts, res, proj.b);
+        render(history, proj.pts, res, proj.b, cov);
         // Store frame for scrub
         const meanPt = { x: res.xmean()[0], y: res.xmean()[1] };
-        const covMat = Array.from(es.cov_matrix());
-        const cov = [covMat[0], covMat[1], covMat[2], covMat[3]];
       if (playbackState.frames.length > 1000) playbackState.frames.shift();
       playbackState.frames.push({
         pts: proj.pts,
@@ -874,7 +872,7 @@ function f(x) {
       return { bestF, ms: (t1-t0), bestX };
     }
 
-    function render(hist, batch, res, projBest) {
+    function render(hist, batch, res, projBest, cov) {
       if (!hist.length) return;
       const xDomain = [0, d3.max(hist, (d) => d.iter) + 1];
       const yMin = Math.max(1e-9, Math.min(...hist.map((d) => d.best)));
@@ -893,7 +891,7 @@ function f(x) {
 
         const meanPt = projBest || { x: res.best_x()[0], y: res.best_x()[1] };
         updatePoints(batch, meanPt);
-        updateEllipse(meanPt, cov);
+        if (cov) updateEllipse(meanPt, cov);
 
       bestEl.textContent = `best f = ${res.best_f.toExponential(3)}`;
       iterEl.textContent = `Iter ${hist[hist.length - 1].iter}`;
