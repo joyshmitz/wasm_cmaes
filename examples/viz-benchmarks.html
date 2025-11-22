@@ -279,14 +279,27 @@
     import * as THREE from "three";
     import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 
-    // Load lucide icon paths (fallback-safe)
-    let lucideIcons = {};
-    try {
-      const res = await fetch("https://unpkg.com/lucide-static@0.321.0/icons.json");
-      if (res.ok) lucideIcons = await res.json();
-    } catch (_) {
-      lucideIcons = {};
-    }
+    // Minimal lucide icon paths (inline to avoid CORS failures in demos)
+    const lucideIcons = {
+      activity: ["<path d='M22 12h-4l-3 9L9 3l-3 9H2'></path>"],
+      cpu: [
+        "<rect x='4' y='4' width='16' height='16' rx='2' ry='2'></rect>",
+        "<rect x='9' y='9' width='6' height='6'></rect>",
+        "<path d='M15 2v2'></path>",
+        "<path d='M9 2v2'></path>",
+        "<path d='M15 20v2'></path>",
+        "<path d='M9 20v2'></path>",
+        "<path d='M2 15h2'></path>",
+        "<path d='M2 9h2'></path>",
+        "<path d='M20 15h2'></path>",
+        "<path d='M20 9h2'></path>",
+      ],
+      'bar-chart-2': [
+        "<line x1='18' y1='20' x2='18' y2='10'></line>",
+        "<line x1='12' y1='20' x2='12' y2='4'></line>",
+        "<line x1='6' y1='20' x2='6' y2='14'></line>",
+      ],
+    };
 
     // Monaco editor setup
     const defaultCustomCode = `// Return a scalar fitness; lower is better
@@ -443,10 +456,23 @@ function f(x) {
     const timingEl = mustGet('timing');
     const raceResults = mustGet('race-results');
 
+    // Safer event binding helper to avoid null derefs when markup changes
+    const bind = (id, event, handler) => {
+      const el = document.getElementById(id);
+      if (!el) {
+        console.warn(`Skipping listener: #${id} not found`);
+        return null;
+      }
+      el.addEventListener(event, handler);
+      return el;
+    };
+
     const lineSvg = d3.select('#line');
     const scrub = mustGet('scrub');
     const scrubPlay = mustGet('scrub-play');
     const playbackState = { frames: [], playing: false, idx: 0 };
+    let currentHist = [];
+    let currentMaxIter = null;
     const lineMargin = { top: 10, right: 10, bottom: 30, left: 50 };
     const width = 800, height = 320;
 
@@ -459,6 +485,8 @@ function f(x) {
     lineG.append('g').attr('class', 'axis axis-y');
 
     const linePath = lineG.append('path').attr('fill', 'none').attr('stroke', '#38bdf8').attr('stroke-width', 2.5);
+    const lineCursor = lineG.append('line').attr('stroke', '#f59e0b').attr('stroke-width', 1.5).attr('y1', 0).attr('y2', height - lineMargin.top - lineMargin.bottom).attr('opacity', 0.75).style('display', 'none');
+    const lineDot = lineG.append('circle').attr('r', 4).attr('fill', '#f59e0b').attr('stroke', '#0f172a').attr('stroke-width', 1).style('display', 'none');
 
     const statusEl = document.getElementById('status');
     const bestEl = document.getElementById('best-display');
@@ -733,6 +761,7 @@ function f(x) {
       const maxIter = Number(document.getElementById('iters').value) || 250;
       const seed = Number(document.getElementById('seed').value) || 42;
       const dim = currentDim(benchKey);
+      currentMaxIter = maxIter;
       dimLabel.textContent = '2D surface view';
 
       const opts = buildOptions(lambda, maxIter, seed, dim);
@@ -751,6 +780,7 @@ function f(x) {
       playbackState.frames = [];
       playbackState.idx = 0;
       scrub.max = 0;
+      currentHist = history;
 
       const stepOnce = () => {
         const lambda = es.lambda;
@@ -880,11 +910,14 @@ function f(x) {
       return { bestF, ms: (t1-t0), bestX };
     }
 
-    function render(hist, batch, res, projBest, cov) {
-      if (!hist.length) return;
-      const xDomain = [0, d3.max(hist, (d) => d.iter) + 1];
-      const yMin = Math.max(1e-9, Math.min(...hist.map((d) => d.best)));
-      const yMax = d3.max(hist, (d) => d.best) || 1;
+    function renderLine(idxOverride = null) {
+      if (!currentHist.length) return;
+      const lastIdx = idxOverride === null ? currentHist.length - 1 : idxOverride;
+      const subHist = currentHist.slice(0, Math.max(1, lastIdx + 1));
+      const xMax = currentMaxIter ?? (currentHist[currentHist.length - 1]?.iter ?? lastIdx);
+      const xDomain = [0, Math.max(xMax, subHist[subHist.length - 1].iter + 1)];
+      const yMin = Math.max(1e-9, Math.min(...subHist.map((d) => d.best)));
+      const yMax = d3.max(subHist, (d) => d.best) || 1;
       lineX.domain(xDomain);
       lineY.domain([yMin, yMax]);
 
@@ -895,19 +928,33 @@ function f(x) {
         .x((d) => lineX(d.iter))
         .y((d) => lineY(d.best))
         .curve(d3.curveCatmullRom.alpha(0.6));
-      linePath.attr('d', lineGen(hist));
+      linePath.attr('d', lineGen(subHist));
 
-        const meanPt = projBest || { x: res.best_x()[0], y: res.best_x()[1] };
-        updatePoints(batch, meanPt);
-        if (cov) updateEllipse(meanPt, cov);
+      const latest = subHist[subHist.length - 1];
+      lineCursor.style('display', 'block')
+        .attr('x1', lineX(latest.iter))
+        .attr('x2', lineX(latest.iter));
+      lineDot.style('display', 'block')
+        .attr('cx', lineX(latest.iter))
+        .attr('cy', lineY(latest.best));
+    }
+
+    function render(hist, batch, res, projBest, cov) {
+      if (!hist.length) return;
+      currentHist = hist;
+      renderLine();
+
+      const meanPt = projBest || { x: res.best_x()[0], y: res.best_x()[1] };
+      updatePoints(batch, meanPt);
+      if (cov) updateEllipse(meanPt, cov);
 
       bestEl.textContent = `best f = ${res.best_f.toExponential(3)}`;
       iterEl.textContent = `Iter ${hist[hist.length - 1].iter}`;
     }
 
-    document.getElementById('run').addEventListener('click', run);
-    document.getElementById('run-js').addEventListener('click', () => runJsBaseline());
-    document.getElementById('run-race').addEventListener('click', async () => {
+    bind('run', 'click', run);
+    bind('run-js', 'click', () => runJsBaseline());
+    bind('run-race', 'click', async () => {
       statusEl.textContent = 'Race: running WASM...';
       const benchKey = benchSelect.value;
       const bench = benchFns[benchKey];
@@ -949,28 +996,33 @@ function f(x) {
       dimLabel.textContent = '2D surface view';
     });
 
-    const playLoop = () => {
-      if (!playbackState.playing || playbackState.frames.length === 0) return;
-      playbackState.idx = (playbackState.idx + 1) % playbackState.frames.length;
-      scrub.value = playbackState.idx;
-      const frame = playbackState.frames[playbackState.idx];
+    const showFrame = (frame) => {
+      if (!frame) return;
       updatePoints(frame.pts, frame.mean);
       updateEllipse(frame.mean, frame.cov);
       iterEl.textContent = `Iter ${frame.iter}`;
       bestEl.textContent = `best f = ${frame.bestF?.toExponential?.(3) ?? '–'}`;
+      renderLine(frame.iter);
+      lineCursor.style('display', 'block')
+        .attr('x1', lineX(frame.iter))
+        .attr('x2', lineX(frame.iter));
+      lineDot.style('display', 'block')
+        .attr('cx', lineX(frame.iter))
+        .attr('cy', lineY(frame.bestF || 1e-9));
+    };
+
+    const playLoop = () => {
+      if (!playbackState.playing || playbackState.frames.length === 0) return;
+      playbackState.idx = (playbackState.idx + 1) % playbackState.frames.length;
+      scrub.value = playbackState.idx;
+      showFrame(playbackState.frames[playbackState.idx]);
       requestAnimationFrame(playLoop);
     };
 
     scrub.addEventListener('input', () => {
       const idx = Number(scrub.value) || 0;
       playbackState.idx = idx;
-      const frame = playbackState.frames[idx];
-      if (frame) {
-        updatePoints(frame.pts, frame.mean);
-        updateEllipse(frame.mean, frame.cov);
-        iterEl.textContent = `Iter ${frame.iter}`;
-        bestEl.textContent = `best f = ${frame.bestF?.toExponential?.(3) ?? '–'}`;
-      }
+      showFrame(playbackState.frames[idx]);
     });
 
     scrubPlay.addEventListener('click', () => {
@@ -979,7 +1031,7 @@ function f(x) {
       if (playbackState.playing) requestAnimationFrame(playLoop);
     });
 
-    document.getElementById('apply-custom').addEventListener('click', async () => {
+    bind('apply-custom', 'click', async () => {
       await monacoReady;
       try {
         const code = editor.getValue();
@@ -1006,16 +1058,13 @@ function f(x) {
     const storyText = document.getElementById('story-text');
     const storyOverlay = document.getElementById('story-overlay');
     const storyOverlayText = document.getElementById('story-overlay-text');
-    const updateStory = () => { storyText.textContent = storySteps[storyIdx]; };
+    const updateStory = () => { if (storyText) storyText.textContent = storySteps[storyIdx]; };
     updateStory();
-    const storyPrev = mustGet('story-prev');
-    const storyNext = mustGet('story-next');
-    const storyClose = mustGet('story-close');
-    storyPrev.addEventListener('click', () => { storyIdx = (storyIdx - 1 + storySteps.length) % storySteps.length; updateStory(); });
-    storyNext.addEventListener('click', () => { storyIdx = (storyIdx + 1) % storySteps.length; updateStory(); });
-    storyClose.addEventListener('click', () => storyOverlay.classList.add('hidden'));
-    storyText.addEventListener('click', () => { storyOverlayText.textContent = storySteps[storyIdx]; storyOverlay.classList.remove('hidden'); });
-    document.getElementById('story-open').addEventListener('click', () => { storyOverlayText.textContent = storySteps[storyIdx]; storyOverlay.classList.remove('hidden'); });
+    bind('story-prev', 'click', () => { storyIdx = (storyIdx - 1 + storySteps.length) % storySteps.length; updateStory(); });
+    bind('story-next', 'click', () => { storyIdx = (storyIdx + 1) % storySteps.length; updateStory(); });
+    bind('story-close', 'click', () => storyOverlay?.classList.add('hidden'));
+    bind('story-text', 'click', () => { if (storyOverlayText) storyOverlayText.textContent = storySteps[storyIdx]; storyOverlay?.classList.remove('hidden'); });
+    bind('story-open', 'click', () => { if (storyOverlayText) storyOverlayText.textContent = storySteps[storyIdx]; storyOverlay?.classList.remove('hidden'); });
 
     // FPS HUD
     let lastFrame = performance.now();
