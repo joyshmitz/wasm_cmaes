@@ -66,87 +66,53 @@ CMA-ES is a **state-of-the-art derivative-free optimization algorithm** that exc
 ## 🏗️ Architecture
 
 ```mermaid
-flowchart TB
-    subgraph Layer1["🌐 JavaScript/TypeScript API"]
-        direction TB
-        A1["fmin()"]
-        A2["WasmCmaes"]
-        A3["CmaesRunner"]
-        A4["Batch API"]
-        A5["JS Baseline"]
-        
-        A1 --> A2
-        A2 --> A3
-        A2 --> A4
-        A5 -.->|"5-20× slower"| A1
+flowchart LR
+    subgraph L1["🌐 JS/TS API"]
+        A1["fmin()"] --> A2["WasmCmaes"]
+        A2 --> A3["CmaesRunner"]
+        A2 --> A4["Batch API"]
     end
 
-    subgraph Layer2["🔗 wasm-bindgen"]
-        direction TB
-        B1["wasm_bindgen"]
-        B2["serde_wasm_bindgen"]
-        B3["TypeScript"]
-        
-        B1 --> B2
-        B1 --> B3
+    subgraph L2["🔗 wasm-bindgen"]
+        B1["wasm_bindgen"] --> B2["serde"]
+        B1 --> B3["TypeScript"]
     end
 
-    subgraph Layer3["🦀 Rust Core"]
-        direction TB
-        C1["Ask/Tell Loop"]
-        C2["Covariance Update"]
-        C3["Sigma Adaptation"]
-        C4["RNG + SIMD"]
-        C5["Rayon Parallel"]
-        C6["Constraints"]
-        C7["Restarts"]
-        
-        C1 --> C2
-        C2 --> C3
-        C3 --> C1
-        C1 --> C4
-        C1 --> C5
-        C1 --> C6
-        C1 --> C7
+    subgraph L3["🦀 Rust Core"]
+        C1["Ask/Tell"] --> C2["Covariance"]
+        C2 --> C3["Sigma"]
+        C1 --> C4["SIMD"]
+        C1 --> C5["Rayon"]
     end
 
-    subgraph Layer4["🎨 Visualizations"]
-        direction TB
-        D1["D3.js"]
-        D2["Three.js"]
-        D3["PCA"]
-        D4["Parcoords"]
-        D5["Animation"]
-        
-        D1 --> D2
-        D2 --> D3
-        D3 --> D4
-        D4 --> D5
+    subgraph L4["🎨 Visualizations"]
+        D1["D3.js"] --> D2["Three.js"]
+        D2 --> D3["PCA"]
     end
 
-    Layer1 -->|"API"| Layer2
-    Layer2 -->|"WASM"| Layer3
-    Layer4 -->|"Uses"| Layer1
+    L1 -->|API| L2
+    L2 -->|WASM| L3
+    L4 -->|Uses| L1
 
-    classDef jsLayer fill:#fef3c7,stroke:#f59e0b,stroke-width:1px,color:#78350f
-    classDef wasmLayer fill:#e9d5ff,stroke:#a855f7,stroke-width:1px,color:#581c87
-    classDef rustLayer fill:#fecdd3,stroke:#f43f5e,stroke-width:1px,color:#881337
-    classDef vizLayer fill:#fce7f3,stroke:#ec4899,stroke-width:1px,color:#831843
+    classDef jsLayer fill:#fef9e7,stroke:#d4a574,stroke-width:1.5px,color:#5c3e1f
+    classDef wasmLayer fill:#f3e8ff,stroke:#b794d4,stroke-width:1.5px,color:#4a2c5c
+    classDef rustLayer fill:#ffe5e8,stroke:#e8a5a5,stroke-width:1.5px,color:#6b3a3a
+    classDef vizLayer fill:#ffeef5,stroke:#f5b8c8,stroke-width:1.5px,color:#6b3a4a
     
-    classDef jsNode fill:#fffbeb,stroke:#fbbf24,stroke-width:1px,color:#78350f
-    classDef wasmNode fill:#f3e8ff,stroke:#c084fc,stroke-width:1px,color:#581c87
-    classDef rustNode fill:#fff1f2,stroke:#fb7185,stroke-width:1px,color:#881337
-    classDef vizNode fill:#fdf2f8,stroke:#f9a8d4,stroke-width:1px,color:#831843
+    classDef jsNode fill:#fffbf0,stroke:#d4a574,stroke-width:1px,color:#5c3e1f
+    classDef wasmNode fill:#faf5ff,stroke:#b794d4,stroke-width:1px,color:#4a2c5c
+    classDef rustNode fill:#fff5f6,stroke:#e8a5a5,stroke-width:1px,color:#6b3a3a
+    classDef vizNode fill:#fff8fa,stroke:#f5b8c8,stroke-width:1px,color:#6b3a4a
 
-    class Layer1 jsLayer
-    class Layer2 wasmLayer
-    class Layer3 rustLayer
-    class Layer4 vizLayer
+    class L1 jsLayer
+    class L2 wasmLayer
+    class L3 rustLayer
+    class L4 vizLayer
     
-    class A1,A2,A3,A4,A5 jsNode
+    class A1,A2,A3,A4 jsNode
     class B1,B2,B3 wasmNode
-    class C1,C2,C3,C4,C5,C6,C7 rustNode
-    class D1,D2,D3,D4,D5 vizNode
+    class C1,C2,C3,C4,C5 rustNode
+    class D1,D2,D3 vizNode
 ```
 
 ## ✨ Features
