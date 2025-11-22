@@ -431,6 +431,15 @@ export class WasmCmaes {
         wasm.__wbg_wasmcmaes_free(ptr, 0);
     }
     /**
+     * Current covariance matrix (sigma^2 * C) flattened row-major.
+     * For sep/lm engines, off-diagonal entries are zero.
+     * @returns {Float64Array}
+     */
+    cov_matrix() {
+        const ret = wasm.wasmcmaes_cov_matrix(this.__wbg_ptr);
+        return ret;
+    }
+    /**
      * @returns {StopStatus}
      */
     stop_status() {

@@ -23,6 +23,7 @@ export const stopstatus_tolx: (a: number) => number;
 export const wasm_cmaes_from_state: (a: any) => [number, number, number];
 export const wasmcmaes_ask: (a: number) => any;
 export const wasmcmaes_ask_flat: (a: number) => any;
+export const wasmcmaes_cov_matrix: (a: number) => any;
 export const wasmcmaes_dimension: (a: number) => number;
 export const wasmcmaes_lambda: (a: number) => number;
 export const wasmcmaes_new: (a: any, b: number, c: number) => number;

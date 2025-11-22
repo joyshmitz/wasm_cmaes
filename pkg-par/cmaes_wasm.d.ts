@@ -30,6 +30,11 @@ export class StopStatus {
 export class WasmCmaes {
   free(): void;
   [Symbol.dispose](): void;
+  /**
+   * Current covariance matrix (sigma^2 * C) flattened row-major.
+   * For sep/lm engines, off-diagonal entries are zero.
+   */
+  cov_matrix(): Float64Array;
   stop_status(): StopStatus;
   to_json_state(): any;
   ask(): Array<any>;
@@ -68,6 +73,7 @@ export interface InitOutput {
   readonly wasm_cmaes_from_state: (a: any) => [number, number, number];
   readonly wasmcmaes_ask: (a: number) => any;
   readonly wasmcmaes_ask_flat: (a: number) => any;
+  readonly wasmcmaes_cov_matrix: (a: number) => any;
   readonly wasmcmaes_dimension: (a: number) => number;
   readonly wasmcmaes_lambda: (a: number) => number;
   readonly wasmcmaes_new: (a: any, b: number, c: number) => number;
