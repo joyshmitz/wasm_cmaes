@@ -523,6 +523,24 @@
           <p id="bench-help" class="text-xs text-slate-400 sr-only">
             Choose a mathematical test function for the optimizer to minimize
           </p>
+
+          <!-- Curated presets -->
+          <div class="space-y-2 mt-3">
+            <div class="flex items-center justify-between gap-2">
+              <span class="text-sm font-medium text-slate-200">Curated presets</span>
+              <span class="text-xs text-slate-400">One-click apply</span>
+            </div>
+            <div id="preset-gallery" class="grid grid-cols-1 sm:grid-cols-2 gap-2"></div>
+          </div>
+
+          <!-- Recently used -->
+          <div class="space-y-2">
+            <div class="flex items-center justify-between gap-2">
+              <span class="text-sm font-medium text-slate-200">Recently used</span>
+              <span class="text-xs text-slate-400">Last few presets</span>
+            </div>
+            <div id="recent-presets" class="flex flex-wrap gap-2"></div>
+          </div>
         </div>
 
         <!-- Parameter recommendations banner -->
@@ -838,6 +856,22 @@
               <option value="alpine">Alpine N1</option>
               <option value="bukin6">Bukin N.6</option>
             </select>
+
+            <div class="space-y-2 mt-2">
+              <div class="flex items-center justify-between gap-2">
+                <span class="text-sm font-medium text-slate-200">Presets</span>
+                <span class="text-xs text-slate-400">Tap to apply</span>
+              </div>
+              <div id="preset-gallery-mobile" class="grid grid-cols-1 gap-2"></div>
+            </div>
+
+            <div class="space-y-2">
+              <div class="flex items-center justify-between gap-2">
+                <span class="text-sm font-medium text-slate-200">Recent</span>
+                <span class="text-xs text-slate-400">Last few</span>
+              </div>
+              <div id="recent-presets-mobile" class="flex flex-wrap gap-2"></div>
+            </div>
           </div>
 
           <!-- Lambda and Sigma -->

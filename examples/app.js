@@ -140,6 +140,62 @@ function f(x) {
       },
     };
 
+    const curatedPresets = [
+      {
+        id: 'sphere-quick',
+        label: 'Sphere · quick',
+        bench: 'sphere',
+        lambda: 16,
+        sigma: 1.0,
+        iters: 200,
+        seed: 42,
+        bounds: { enabled: false, lo: -5, hi: 5 }
+      },
+      {
+        id: 'rastrigin-explore',
+        label: 'Rastrigin · explore',
+        bench: 'rastrigin',
+        lambda: 48,
+        sigma: 1.8,
+        iters: 300,
+        seed: 7,
+        bounds: { enabled: true, lo: -5.12, hi: 5.12 }
+      },
+      {
+        id: 'ackley-fast',
+        label: 'Ackley · fast settle',
+        bench: 'ackley',
+        lambda: 24,
+        sigma: 1.4,
+        iters: 220,
+        seed: 17,
+        bounds: { enabled: true, lo: -5, hi: 5 }
+      },
+      {
+        id: 'griewank-wide',
+        label: 'Griewank · wide',
+        bench: 'griewank',
+        lambda: 40,
+        sigma: 2.0,
+        iters: 320,
+        seed: 99,
+        bounds: { enabled: true, lo: -10, hi: 10 }
+      },
+      {
+        id: 'schwefel-deep',
+        label: 'Schwefel · deep dive',
+        bench: 'schwefel',
+        lambda: 64,
+        sigma: 3.0,
+        iters: 350,
+        seed: 123,
+        bounds: { enabled: true, lo: -500, hi: 500 }
+      }
+    ];
+
+    const RECENTS_KEY = 'cmaes-recent-presets';
+    const MAX_RECENTS = 6;
+
     // Inject lucide icons
     const parser = new DOMParser();
     document.querySelectorAll('.lucide').forEach((el) => {
@@ -228,6 +284,8 @@ function f(x) {
       return 2;
     }
 
+    const getMobileEl = (id) => document.getElementById(`${id}-mobile`);
+
     function buildOptions(lambda, maxIter, seed, dim) {
       const opts = { popsize: lambda, seed, maxEvals: lambda * maxIter };
       if (boundsToggle.checked) {
@@ -246,6 +304,168 @@ function f(x) {
         adaptive: noiseAdaptive.checked,
       };
       return opts;
+    }
+
+    // Preset helpers ---------------------------------------------------------
+    const mobileRefs = {
+      bench: getMobileEl('bench'),
+      lambda: getMobileEl('lambda'),
+      sigma: getMobileEl('sigma'),
+      iters: getMobileEl('iters'),
+      seed: getMobileEl('seed'),
+      bounds: getMobileEl('bounds-toggle'),
+      lo: getMobileEl('bound-lo'),
+      hi: getMobileEl('bound-hi'),
+    };
+
+    const loadRecentPresets = () => {
+      try {
+        const raw = localStorage.getItem(RECENTS_KEY);
+        const parsed = raw ? JSON.parse(raw) : [];
+        return Array.isArray(parsed) ? parsed : [];
+      } catch (_) {
+        return [];
+      }
+    };
+
+    const persistRecentPresets = (items) => {
+      try {
+        localStorage.setItem(RECENTS_KEY, JSON.stringify(items.slice(0, MAX_RECENTS)));
+      } catch (_) {
+        /* ignore */
+      }
+    };
+
+    let recentPresets = loadRecentPresets();
+
+    const presetKey = (p) => [
+      p.bench,
+      p.lambda,
+      p.sigma,
+      p.iters,
+      p.seed,
+      p.bounds?.enabled,
+      p.bounds?.lo,
+      p.bounds?.hi
+    ].join('|');
+
+    function saveRecentPreset(preset) {
+      const key = presetKey(preset);
+      recentPresets = [
+        { ...preset, key, touchedAt: Date.now() },
+        ...recentPresets.filter((r) => r.key !== key)
+      ].slice(0, MAX_RECENTS);
+      persistRecentPresets(recentPresets);
+      renderRecentPresets();
+      renderRecentPresets(true);
+    }
+
+    function applyPreset(preset, { toast = true } = {}) {
+      benchSelect.value = preset.bench;
+      lambdaInput.value = preset.lambda;
+      sigmaInput.value = preset.sigma;
+      itersInput.value = preset.iters;
+      seedInput.value = preset.seed;
+      boundsToggle.checked = !!preset.bounds?.enabled;
+      if (preset.bounds) {
+        boundLo.value = preset.bounds.lo;
+        boundHi.value = preset.bounds.hi;
+      }
+
+      // Keep mobile inputs in sync
+      if (mobileRefs.bench) mobileRefs.bench.value = preset.bench;
+      if (mobileRefs.lambda) mobileRefs.lambda.value = preset.lambda;
+      if (mobileRefs.sigma) mobileRefs.sigma.value = preset.sigma;
+      if (mobileRefs.iters) mobileRefs.iters.value = preset.iters;
+      if (mobileRefs.seed) mobileRefs.seed.value = preset.seed;
+      if (mobileRefs.bounds) mobileRefs.bounds.checked = !!preset.bounds?.enabled;
+      if (mobileRefs.lo && preset.bounds) mobileRefs.lo.value = preset.bounds.lo;
+      if (mobileRefs.hi && preset.bounds) mobileRefs.hi.value = preset.bounds.hi;
+
+      saveRecentPreset(preset);
+      if (toast) showToast(`Preset applied: ${preset.label}`, 'success', 1800);
+    }
+
+    function renderPresetGallery(isMobile = false) {
+      const host = document.getElementById(isMobile ? 'preset-gallery-mobile' : 'preset-gallery');
+      if (!host) return;
+      host.replaceChildren();
+      curatedPresets.forEach((preset) => {
+        const card = document.createElement('div');
+        card.className = 'panel rounded-lg p-3 flex flex-col gap-2 border border-slate-700/60';
+
+        const header = document.createElement('div');
+        header.className = 'flex items-center justify-between gap-2';
+        const title = document.createElement('div');
+        title.className = 'text-sm font-semibold text-slate-100';
+        title.textContent = preset.label;
+        const bench = document.createElement('span');
+        bench.className = 'text-xs text-slate-400';
+        bench.textContent = benchFns[preset.bench]?.title || preset.bench;
+        header.append(title, bench);
+
+        const badges = document.createElement('div');
+        badges.className = 'flex flex-wrap gap-2 text-xs text-slate-200';
+        const makeBadge = (text) => {
+          const b = document.createElement('span');
+          b.className = 'px-2 py-1 rounded-full bg-slate-800 border border-slate-700';
+          b.textContent = text;
+          return b;
+        };
+        badges.append(
+          makeBadge(`λ ${preset.lambda}`),
+          makeBadge(`σ ${preset.sigma}`),
+          makeBadge(preset.bounds?.enabled ? `bounds [${preset.bounds.lo}, ${preset.bounds.hi}]` : 'no bounds'),
+          makeBadge(`${preset.iters} iters`)
+        );
+
+        const actions = document.createElement('div');
+        actions.className = 'flex gap-2';
+        const applyBtn = document.createElement('button');
+        applyBtn.className = 'flex-1 bg-sky-500 hover:bg-sky-400 text-slate-900 font-semibold px-3 py-2 rounded-lg text-sm';
+        applyBtn.textContent = 'Apply';
+        applyBtn.addEventListener('click', () => applyPreset(preset));
+
+        const linkBtn = document.createElement('button');
+        linkBtn.className = 'px-3 py-2 rounded-lg border border-slate-700 text-slate-100 text-sm';
+        linkBtn.textContent = 'Copy link';
+        linkBtn.addEventListener('click', () => {
+          shareConfig({
+            bench: preset.bench,
+            lambda: preset.lambda,
+            sigma: preset.sigma,
+            iters: preset.iters,
+            seed: preset.seed,
+            boundsEnabled: preset.bounds?.enabled ?? false,
+            lo: preset.bounds?.lo ?? boundLo.value,
+            hi: preset.bounds?.hi ?? boundHi.value
+          });
+        });
+        actions.append(applyBtn, linkBtn);
+
+        card.append(header, badges, actions);
+        host.appendChild(card);
+      });
+    }
+
+    function renderRecentPresets(isMobile = false) {
+      const host = document.getElementById(isMobile ? 'recent-presets-mobile' : 'recent-presets');
+      if (!host) return;
+      host.replaceChildren();
+      if (!recentPresets.length) {
+        const empty = document.createElement('div');
+        empty.className = 'text-xs text-slate-500';
+        empty.textContent = 'No recent presets yet';
+        host.appendChild(empty);
+        return;
+      }
+      recentPresets.forEach((preset) => {
+        const btn = document.createElement('button');
+        btn.className = 'px-3 py-1.5 rounded-full border border-slate-700 bg-slate-900 text-slate-100 text-xs hover:border-sky-500';
+        btn.textContent = preset.label;
+        btn.addEventListener('click', () => applyPreset(preset, { toast: true }));
+        host.appendChild(btn);
+      });
     }
 
     function projectCandidates(cands, bestVec, dim) {
@@ -1044,27 +1264,30 @@ function f(x) {
     }
 
     // Share configuration via URL
-    function shareConfig() {
+    function buildConfigURL(overrides = {}) {
       const params = new URLSearchParams({
-        bench: benchSelect.value,
-        lambda: lambdaInput.value,
-        sigma: sigmaInput.value,
-        iters: itersInput.value,
-        seed: seedInput.value
+        bench: overrides.bench ?? benchSelect.value,
+        lambda: overrides.lambda ?? lambdaInput.value,
+        sigma: overrides.sigma ?? sigmaInput.value,
+        iters: overrides.iters ?? itersInput.value,
+        seed: overrides.seed ?? seedInput.value,
+        bounds: overrides.boundsEnabled ?? boundsToggle.checked,
+        lo: overrides.lo ?? boundLo.value,
+        hi: overrides.hi ?? boundHi.value
       });
+      return `${window.location.origin}${window.location.pathname}?${params.toString()}`;
+    }
 
-      const url = `${window.location.origin}${window.location.pathname}?${params.toString()}`;
-
+    function copyTextWithFallback(text, successMsg = 'Copied to clipboard', errorMsg = 'Copy failed') {
       if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(url).then(() => {
-          showToast('Configuration URL copied to clipboard!', 'success');
+        navigator.clipboard.writeText(text).then(() => {
+          showToast(successMsg, 'success');
         }).catch(() => {
-          showToast('Failed to copy URL', 'error');
+          showToast(errorMsg, 'error');
         });
       } else {
-        // Fallback for older browsers
         const textArea = document.createElement('textarea');
-        textArea.value = url;
+        textArea.value = text;
         textArea.style.position = 'fixed';
         textArea.style.left = '-999999px';
         document.body.appendChild(textArea);
@@ -1072,12 +1295,17 @@ function f(x) {
         textArea.select();
         try {
           document.execCommand('copy');
-          showToast('Configuration URL copied to clipboard!', 'success');
+          showToast(successMsg, 'success');
         } catch (err) {
-          showToast('Failed to copy URL', 'error');
+          showToast(errorMsg, 'error');
         }
         document.body.removeChild(textArea);
       }
+    }
+
+    function shareConfig(overrides = {}) {
+      const url = buildConfigURL(overrides);
+      copyTextWithFallback(url, 'Configuration URL copied to clipboard!', 'Failed to copy URL');
     }
 
     // Load configuration from URL on page load
@@ -1089,6 +1317,19 @@ function f(x) {
       if (params.has('sigma')) sigmaInput.value = params.get('sigma');
       if (params.has('iters')) itersInput.value = params.get('iters');
       if (params.has('seed')) seedInput.value = params.get('seed');
+      if (params.has('bounds')) boundsToggle.checked = params.get('bounds') === 'true';
+      if (params.has('lo')) boundLo.value = params.get('lo');
+      if (params.has('hi')) boundHi.value = params.get('hi');
+
+      // Mirror to mobile controls if present
+      if (mobileRefs.bench) mobileRefs.bench.value = benchSelect.value;
+      if (mobileRefs.lambda) mobileRefs.lambda.value = lambdaInput.value;
+      if (mobileRefs.sigma) mobileRefs.sigma.value = sigmaInput.value;
+      if (mobileRefs.iters) mobileRefs.iters.value = itersInput.value;
+      if (mobileRefs.seed) mobileRefs.seed.value = seedInput.value;
+      if (mobileRefs.bounds) mobileRefs.bounds.checked = boundsToggle.checked;
+      if (mobileRefs.lo) mobileRefs.lo.value = boundLo.value;
+      if (mobileRefs.hi) mobileRefs.hi.value = boundHi.value;
 
       if (params.size > 0) {
         showToast('Configuration loaded from URL', 'info');
@@ -1209,6 +1450,10 @@ function f(x) {
 
     // Initialize: Load config from URL if present
     loadConfigFromURL();
+    renderPresetGallery();
+    renderPresetGallery(true);
+    renderRecentPresets();
+    renderRecentPresets(true);
 
     // Add event listeners to export buttons if they exist
     exportCsvBtn.addEventListener('click', exportCSV);
