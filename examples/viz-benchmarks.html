@@ -1,670 +1,1091 @@
 <!doctype html>
-<html lang="en" class="dark antialiased">
+<html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-  <meta name="theme-color" content="#0f172a">
-  <meta name="description" content="High-performance WebAssembly optimization benchmark.">
-  <title>WASM CMA-ES · Studio</title>
-  
-  <!-- Favicon -->
-  <link rel="icon" href="../favicon.ico" />
-  <link rel="manifest" href="../manifest.json" />
-
-  <!-- Fonts: Inter & JetBrains Mono -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-
-  <!-- Tailwind -->
-  <link rel="stylesheet" href="./tailwind.css" />
-  
-  <!-- Icons -->
-  <script src="https://unpkg.com/lucide@latest"></script>
-
-  <!-- Libraries -->
-  <script type="importmap">
-    { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js" } }
-  </script>
+  <title>CMA-ES Benchmark Gallery</title>
+  <link rel="icon" href="/wasm_cmaes/favicon.ico" />
+  <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
   <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js"></script>
-  <script src="https://unpkg.com/tippy.js@6"></script>
-  <script src="https://cdn.jsdelivr.net/npm/cupertino-pane@1.3.6/dist/cupertino-pane.min.js"></script>
-
+  <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs/loader.js"></script>
   <style>
     :root {
-      /* Base Palette: Deep, rich Slate */
-      --bg-app: #020617; /* Slate 950 */
-      --bg-sidebar: #0f172a; /* Slate 900 */
-      --border-subtle: rgba(255, 255, 255, 0.08);
-      
-      /* Accent: Indigo -> Violet */
-      --accent-primary: #6366f1;
-      --accent-glow: rgba(99, 102, 241, 0.2);
-      
-      /* Text */
-      --text-main: #f8fafc;
-      --text-muted: #94a3b8;
-      
-      /* Animation */
-      --ease-spring: cubic-bezier(0.175, 0.885, 0.32, 1.1);
+      color-scheme: dark;
     }
-
     body {
-      background-color: var(--bg-app);
-      color: var(--text-main);
-      font-family: 'Inter', system-ui, sans-serif;
-      -webkit-font-smoothing: antialiased;
-      overflow: hidden;
+      min-height: 100vh;
+      color: #e2e8f0;
+      background: radial-gradient(circle at 20% 20%, #122341, #0c162a 40%, #070d1a 70%, #050912);
+      position: relative;
+      overflow-x: hidden;
     }
-
-    /* Typography Polish */
-    h1, h2, h3, .font-heading { letter-spacing: -0.025em; }
-    .font-mono { font-family: 'JetBrains Mono', monospace; letter-spacing: -0.02em; }
-    
-    /* Glassmorphism - Refined */
-    .glass {
-      background: rgba(15, 23, 42, 0.65);
-      backdrop-filter: blur(24px) saturate(180%);
-      -webkit-backdrop-filter: blur(24px) saturate(180%);
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+    @keyframes holoPulse {
+      0% { opacity: 0.8; transform: scale(0.98); }
+      50% { opacity: 1; transform: scale(1.02); }
+      100% { opacity: 0.8; transform: scale(0.98); }
     }
-    
-    /* Inputs - "Stripe-like" */
-    .stripe-input {
-      background: rgba(2, 6, 23, 0.5);
-      border: 1px solid rgba(255,255,255,0.1);
-      color: #f1f5f9;
-      border-radius: 6px;
-      padding: 8px 12px;
-      font-size: 13px;
-      width: 100%;
-      transition: all 0.2s ease;
-      outline: none;
-      box-shadow: 0 1px 2px rgba(0,0,0,0.1) inset;
+    /* animated grid backdrop */
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      background: linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px),
+                  linear-gradient(0deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+      background-size: 80px 80px;
+      mask-image: radial-gradient(circle at 50% 40%, rgba(255,255,255,0.4), transparent 65%);
+      z-index: 0;
+      animation: drift 30s linear infinite;
     }
-    .stripe-input:focus {
-      background: rgba(2, 6, 23, 0.8);
-      border-color: var(--accent-primary);
-      box-shadow: 0 0 0 3px var(--accent-glow), 0 1px 2px rgba(0,0,0,0.1) inset;
+    body::after {
+      content: "";
+      position: fixed;
+      inset: 0;
+      background: radial-gradient(circle at 70% 20%, rgba(56,189,248,0.18), transparent 45%),
+                  radial-gradient(circle at 25% 70%, rgba(99,102,241,0.14), transparent 50%);
+      z-index: 0;
+      pointer-events: none;
     }
-    
-    /* Range Slider - Custom */
-    .stripe-range {
-      -webkit-appearance: none;
-      width: 100%;
-      background: transparent;
-      height: 20px;
-      cursor: pointer;
+    @keyframes drift {
+      from { transform: translate3d(0,0,0); }
+      to   { transform: translate3d(80px,80px,0); }
     }
-    .stripe-range::-webkit-slider-runnable-track {
-      width: 100%;
-      height: 4px;
-      background: #334155;
-      border-radius: 99px;
+    .panel {
+      position: relative;
+      backdrop-filter: blur(12px);
+      background: linear-gradient(135deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02));
+      border: 1px solid rgba(255,255,255,0.08);
+      box-shadow: 0 20px 70px rgba(0,0,0,0.45), 0 0 0 1px rgba(255,255,255,0.04) inset;
+      z-index: 1;
     }
-    .stripe-range::-webkit-slider-thumb {
-      -webkit-appearance: none;
-      height: 16px;
-      width: 16px;
-      border-radius: 50%;
-      background: white;
-      border: 2px solid var(--accent-primary);
-      margin-top: -6px;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.3);
-      transition: transform 0.1s var(--ease-spring);
+    .glow {
+      box-shadow: 0 18px 40px rgba(56,189,248,0.35), 0 0 0 1px rgba(14,165,233,0.35);
     }
-    .stripe-range:active::-webkit-slider-thumb { transform: scale(1.2); }
-
-    /* Scrollbars */
-    .no-scrollbar::-webkit-scrollbar { display: none; }
-    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-
-    /* Cupertino Pane Overrides */
-    .cupertino-pane-wrapper .pane {
-        background: #0f172a !important;
-        border-top: 1px solid rgba(255,255,255,0.1);
-        box-shadow: 0 -20px 60px rgba(0,0,0,0.6);
-    }
-    .cupertino-pane-wrapper .draggable {
-        background: #475569 !important;
-        opacity: 0.5;
-    }
+    .chart text { fill: #cbd5e1; }
+    .chart .axis line, .chart .axis path { stroke: #64748b; }
   </style>
 </head>
-<body class="h-[100dvh] flex flex-col lg:flex-row relative overflow-hidden">
+<body class="min-h-screen">
+  <!-- Three.js background -->
+  <canvas id="bg-canvas" class="fixed inset-0 w-full h-full"></canvas>
 
-  <!-- --- BACKGROUND FX --- -->
-  <!-- Subtle ambient glow for depth -->
-  <div class="absolute inset-0 pointer-events-none overflow-hidden z-0">
-    <div class="absolute -top-[20%] -left-[10%] w-[70%] h-[70%] bg-indigo-950/20 blur-[160px] rounded-full opacity-60"></div>
-    <div class="absolute top-[40%] -right-[10%] w-[60%] h-[60%] bg-slate-900/40 blur-[140px] rounded-full opacity-60"></div>
-    <canvas id="bg-canvas" class="absolute inset-0 w-full h-full opacity-20"></canvas>
-  </div>
-
-  <!-- --- DESKTOP SIDEBAR (320px fixed) --- -->
-  <aside class="hidden lg:flex w-[320px] flex-col border-r border-white/5 bg-slate-950/90 backdrop-blur-xl z-30 shrink-0 shadow-2xl">
-    <!-- Header -->
-    <div class="h-16 flex items-center px-6 border-b border-white/5 shrink-0 bg-slate-950/50">
-      <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center shadow-lg shadow-indigo-500/20 mr-3">
-        <i data-lucide="cpu" class="w-4 h-4 text-white"></i>
+  <div class="max-w-6xl mx-auto py-10 px-6 space-y-6 relative z-10">
+    <header class="flex flex-col gap-3">
+      <div class="inline-flex items-center gap-3 bg-sky-500/10 text-sky-200 px-3 py-1 rounded-full w-fit border border-sky-500/20">
+        <span class="w-2 h-2 rounded-full bg-emerald-300 animate-pulse"></span>
+        <span class="text-xs tracking-[0.25em] uppercase">CMA-ES · WebAssembly</span>
       </div>
-      <div>
-        <h1 class="font-bold text-sm text-slate-100 tracking-tight">WASM CMA-ES</h1>
-        <p class="text-[10px] text-slate-500 font-medium uppercase tracking-wider">Optimization Studio</p>
+      <div class="flex flex-col gap-2">
+        <h1 class="text-4xl font-semibold text-sky-50">Benchmark Playground</h1>
+        <p class="text-slate-200 max-w-3xl">Pick a classic test function and watch CMA-ES explore in 2D. Smooth log-loss, animated scatter, live best tracker. Tunable λ, σ, seeds.</p>
       </div>
-    </div>
+      <div class="grid sm:grid-cols-3 gap-3">
+        <div class="panel rounded-xl p-4 flex flex-col gap-1">
+          <div class="flex items-center gap-2 text-sky-200 text-xs"><span class="lucide" data-icon="cpu"></span>Bundle</div>
+          <p class="text-lg font-semibold text-sky-100">Sequential (pkg)</p>
+          <p class="text-xs text-slate-400">Swap to parallel by importing pkg-par in the script tag.</p>
+        </div>
+        <div class="panel rounded-xl p-4 flex flex-col gap-1">
+          <div class="flex items-center gap-2 text-amber-200 text-xs"><span class="lucide" data-icon="activity"></span>Rendering</div>
+          <p class="text-lg font-semibold text-amber-100">D3 + Tailwind + GSAP</p>
+          <p class="text-xs text-slate-400">Log curve, animated scatter, parallax glow.</p>
+        </div>
+        <div class="panel rounded-xl p-4 flex flex-col gap-1">
+          <div class="flex items-center gap-2 text-emerald-200 text-xs"><span class="lucide" data-icon="bar-chart-2"></span>Status</div>
+          <p id="status" class="text-lg font-semibold text-emerald-200">Idle</p>
+          <p class="text-xs text-slate-400">Tracks iterations/evals in real time.</p>
+        </div>
+      </div>
+    </header>
 
-    <!-- Controls Scroll Area -->
-    <div class="flex-1 overflow-y-auto p-5 space-y-8 no-scrollbar" id="desktop-controls">
-      
-      <!-- Primary Action -->
-      <button id="run" class="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-medium rounded-lg shadow-[0_4px_20px_rgba(99,102,241,0.3),0_0_0_1px_rgba(255,255,255,0.1)_inset] transition-all active:scale-[0.98] flex items-center justify-center gap-2 group relative overflow-hidden">
-        <div class="absolute inset-0 bg-gradient-to-r from-white/0 via-white/10 to-white/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700 ease-in-out"></div>
-        <i data-lucide="play" class="w-4 h-4 fill-current"></i>
-        <span>Run Optimization</span>
-      </button>
-
-      <!-- Section: Benchmark -->
-      <div class="space-y-3">
-        <label class="text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2">
-          <i data-lucide="target" class="w-3 h-3"></i> Objective Function
-        </label>
-        <div class="relative group">
-          <select id="bench" class="stripe-input appearance-none cursor-pointer pr-8 bg-slate-900/50">
-            <option value="sphere">Sphere</option>
-            <option value="rastrigin">Rastrigin</option>
-            <option value="ackley">Ackley</option>
-            <option value="griewank">Griewank</option>
-            <option value="schwefel">Schwefel</option>
-            <option value="levy">Levy</option>
-            <option value="zakharov">Zakharov</option>
-            <option value="alpine">Alpine N1</option>
-            <option value="bukin6">Bukin N.6</option>
+    <section class="grid lg:grid-cols-3 gap-4">
+      <div class="panel rounded-xl p-5 space-y-4 col-span-1">
+        <div class="space-y-2">
+          <label class="block text-sm text-slate-400">Benchmark</label>
+          <select id="bench" class="w-full rounded-lg bg-slate-900 border border-slate-700 px-3 py-2 text-slate-100">
+            <option value="sphere">Sphere (smooth)</option>
+            <option value="rastrigin">Rastrigin (multimodal)</option>
+            <option value="ackley">Ackley (flat valley)</option>
+            <option value="griewank">Griewank (oscillatory)</option>
+            <option value="schwefel">Schwefel (deceptive)</option>
+            <option value="levy">Levy (broad ridges)</option>
+            <option value="zakharov">Zakharov (ill-conditioned)</option>
+            <option value="alpine">Alpine N1 (spiky)</option>
+            <option value="bukin6">Bukin N.6 (steep valley)</option>
           </select>
-          <i data-lucide="chevron-down" class="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none group-hover:text-slate-300 transition-colors"></i>
         </div>
-        <p class="text-[11px] text-slate-500 leading-relaxed px-1" id="param-recommendation-text">
-          Smooth convex function. Good for convergence speed tests.
-        </p>
-      </div>
-
-      <!-- Section: Parameters -->
-      <div class="space-y-4">
-        <div class="flex items-center justify-between">
-          <label class="text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2">
-            <i data-lucide="sliders" class="w-3 h-3"></i> Hyperparameters
-          </label>
-          <button id="toggle-advanced-desktop" class="text-[10px] text-indigo-400 hover:text-indigo-300 font-medium transition-colors">
-            Advanced
-          </button>
-        </div>
-        
         <div class="grid grid-cols-2 gap-3">
-          <div class="space-y-1.5">
-            <label class="text-[11px] font-medium text-slate-400">Population (λ)</label>
-            <input id="lambda" type="number" value="32" class="stripe-input font-mono text-center" />
+          <div>
+            <label class="block text-sm text-slate-400">Lambda (pop)</label>
+            <input id="lambda" type="number" value="32" min="4" max="128" class="w-full rounded-lg bg-slate-900 border border-slate-700 px-3 py-2 text-slate-100" />
           </div>
-          <div class="space-y-1.5">
-            <label class="text-[11px] font-medium text-slate-400">Step Size (σ)</label>
-            <input id="sigma" type="number" value="1.2" step="0.1" class="stripe-input font-mono text-center" />
+          <div>
+            <label class="block text-sm text-slate-400">Sigma</label>
+            <input id="sigma" type="number" value="1.2" step="0.1" class="w-full rounded-lg bg-slate-900 border border-slate-700 px-3 py-2 text-slate-100" />
           </div>
         </div>
-
-        <!-- Advanced Collapsible -->
-        <div id="advanced-options" class="hidden space-y-4 pt-4 border-t border-white/5 animate-in fade-in slide-in-from-top-2 duration-200">
-            <!-- Iters/Seed -->
-            <div class="grid grid-cols-2 gap-3">
-              <div class="space-y-1.5">
-                <label class="text-[11px] font-medium text-slate-400">Max Iters</label>
-                <input id="iters" type="number" value="250" class="stripe-input font-mono text-center" />
-              </div>
-              <div class="space-y-1.5">
-                <label class="text-[11px] font-medium text-slate-400">Seed</label>
-                <input id="seed" type="number" value="42" class="stripe-input font-mono text-center" />
-              </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-sm text-slate-400">Max iters</label>
+            <input id="iters" type="number" value="250" min="10" max="2000" class="w-full rounded-lg bg-slate-900 border border-slate-700 px-3 py-2 text-slate-100" />
+          </div>
+          <div>
+            <label class="block text-sm text-slate-400">Seed</label>
+            <input id="seed" type="number" value="42" min="0" class="w-full rounded-lg bg-slate-900 border border-slate-700 px-3 py-2 text-slate-100" />
+          </div>
+        </div>
+        <div class="grid grid-cols-2 gap-3 items-center">
+          <div>
+            <label class="block text-sm text-slate-400">Dimension (fixed)</label>
+            <input id="dim" type="range" value="2" min="2" max="2" class="w-full" disabled />
+          </div>
+          <div class="text-sm text-slate-300" id="dim-label">2D surface view</div>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-sm text-slate-400">Projection</label>
+            <select id="projection" class="w-full rounded-lg bg-slate-900 border border-slate-700 px-3 py-2 text-slate-100" disabled>
+              <option value="first2">First 2 dims</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm text-slate-400">Race mode</label>
+            <button id="run-race" class="w-full bg-fuchsia-500 hover:bg-fuchsia-400 text-slate-900 font-semibold px-3 py-2 rounded-lg transition">Run WASM vs JS</button>
+          </div>
+        </div>
+        <div class="space-y-2">
+          <label class="block text-sm text-slate-400 flex items-center gap-2">
+            <input id="bounds-toggle" type="checkbox" class="accent-sky-400" /> Enable bounds
+          </label>
+          <div class="grid grid-cols-2 gap-3">
+            <input id="bound-lo" type="number" value="-5" step="0.5" class="rounded-lg bg-slate-900 border border-slate-700 px-3 py-2 text-slate-100" />
+            <input id="bound-hi" type="number" value="5" step="0.5" class="rounded-lg bg-slate-900 border border-slate-700 px-3 py-2 text-slate-100" />
+          </div>
+        </div>
+        <div class="space-y-2">
+          <label class="block text-sm text-slate-400">Noise model</label>
+          <div class="grid grid-cols-3 gap-2 text-sm text-slate-200">
+            <div class="space-y-1">
+              <span class="text-xs text-slate-400">Samples/pt</span>
+              <input id="noise-samples" type="number" value="1" min="1" max="16" class="w-full rounded-lg bg-slate-900 border border-slate-700 px-2 py-1" />
             </div>
-
-            <!-- Constraints Group -->
-            <div class="bg-slate-900/50 p-3 rounded-lg border border-white/5 space-y-3">
-              <div class="flex items-center justify-between">
-                <span class="text-[11px] font-medium text-slate-300">Bounds Constraint</span>
-                <input id="bounds-toggle" type="checkbox" class="accent-indigo-500 w-3.5 h-3.5 rounded cursor-pointer" />
-              </div>
-              <div class="grid grid-cols-2 gap-2">
-                <input id="bound-lo" type="number" value="-5" placeholder="Min" class="stripe-input text-xs text-center py-1.5" />
-                <input id="bound-hi" type="number" value="5" placeholder="Max" class="stripe-input text-xs text-center py-1.5" />
-              </div>
+            <div class="space-y-1">
+              <span class="text-xs text-slate-400">Max samples</span>
+              <input id="noise-max" type="number" value="8" min="1" max="32" class="w-full rounded-lg bg-slate-900 border border-slate-700 px-2 py-1" />
             </div>
-
-            <!-- Toggles -->
-            <label class="flex items-center justify-between p-3 bg-slate-900/50 rounded-lg border border-white/5 cursor-pointer hover:bg-white/5 transition-colors">
-               <span class="text-[11px] font-medium text-slate-300">Noisy Objective</span>
-               <input id="noisy-toggle" type="checkbox" class="w-3.5 h-3.5 accent-amber-500 rounded cursor-pointer" />
-            </label>
-
-            <!-- Covariance Model -->
-             <div class="space-y-1.5">
-               <label class="text-[11px] font-medium text-slate-400">Covariance Model</label>
-               <div class="relative">
-                 <select id="covar-model" class="stripe-input appearance-none bg-slate-900/50 text-xs pr-8">
-                   <option value="auto">Auto (Adaptive)</option>
-                   <option value="full">Full Matrix (Precise)</option>
-                   <option value="sep">Separable (Diagonal)</option>
-                   <option value="lm">Limited Memory</option>
-                 </select>
-                 <i data-lucide="chevron-down" class="absolute right-3 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-500 pointer-events-none"></i>
-               </div>
-             </div>
+            <div class="space-y-1">
+              <label class="flex items-center gap-2 text-xs text-slate-400">
+                <input id="noise-adaptive" type="checkbox" class="accent-sky-400" /> Adaptive
+              </label>
+            </div>
+          </div>
         </div>
-      </div>
-    </div>
-
-    <!-- Footer Actions -->
-    <div class="p-4 border-t border-white/5 bg-slate-950/50 flex items-center justify-between gap-2 text-slate-400">
-      <button id="help-btn" class="p-2 hover:text-white hover:bg-white/5 rounded-md transition-colors" title="Shortcuts">
-        <i data-lucide="keyboard" class="w-4 h-4"></i>
-      </button>
-      <div class="h-4 w-[1px] bg-white/10"></div>
-      <button id="share-config" class="p-2 hover:text-white hover:bg-white/5 rounded-md transition-colors" title="Share Config">
-        <i data-lucide="share-2" class="w-4 h-4"></i>
-      </button>
-      <button id="export-csv" class="p-2 hover:text-white hover:bg-white/5 rounded-md transition-colors" title="Export CSV">
-        <i data-lucide="file-text" class="w-4 h-4"></i>
-      </button>
-      <button id="export-json" class="p-2 hover:text-white hover:bg-white/5 rounded-md transition-colors" title="Export JSON">
-        <i data-lucide="code" class="w-4 h-4"></i>
-      </button>
-    </div>
-  </aside>
-
-
-  <!-- --- MOBILE HEADER (Floating Pill) --- -->
-  <header class="lg:hidden fixed top-4 inset-x-4 z-40 flex items-center justify-between pointer-events-none">
-    <div class="glass px-4 py-2.5 rounded-full flex items-center gap-3 pointer-events-auto shadow-lg">
-      <div class="w-2 h-2 bg-indigo-500 rounded-full animate-pulse shadow-[0_0_8px_#6366f1]"></div>
-      <span class="font-semibold text-xs tracking-wide text-slate-100">STUDIO</span>
-    </div>
-    
-    <div class="glass p-2 rounded-full pointer-events-auto shadow-lg flex items-center">
-      <button id="mobile-menu-btn" class="p-1 text-slate-300 active:text-white transition-colors">
-        <i data-lucide="settings-2" class="w-5 h-5"></i>
-      </button>
-    </div>
-  </header>
-
-
-  <!-- --- MAIN CONTENT --- -->
-  <main class="flex-1 relative flex flex-col h-full overflow-hidden bg-[#020617] z-10">
-    
-    <!-- Progress Bar -->
-    <div id="progress-container" class="absolute top-0 left-0 right-0 h-0.5 bg-indigo-500/20 z-50 hidden">
-      <div id="progress-fill" class="h-full bg-indigo-500 shadow-[0_0_10px_#6366f1] transition-all duration-100" style="width: 0%"></div>
-    </div>
-
-    <!-- Visualization Area -->
-    <div class="flex-1 relative flex flex-col">
-      
-      <!-- 3D Viewport (Full Space) -->
-      <div id="canvas-wrapper" class="absolute inset-0 z-0">
-        <canvas id="three-canvas" class="block w-full h-full outline-none"></canvas>
-      </div>
-
-      <!-- Overlay HUD (Floating Capsules) -->
-      <div class="absolute top-20 lg:top-6 left-6 right-6 flex justify-between items-start pointer-events-none z-20">
-        <!-- Iteration Counter -->
-        <div class="glass px-4 py-2 rounded-full flex items-center gap-3 shadow-xl border-white/10 backdrop-blur-xl animate-in fade-in slide-in-from-top-4 duration-500">
-          <i data-lucide="box" class="w-3.5 h-3.5 text-indigo-400"></i>
-          <span id="iter-display" class="text-xs font-mono font-medium text-slate-200 tabular-nums">Iter 0</span>
+        <div class="flex flex-wrap items-center gap-3">
+          <button id="run" class="relative overflow-hidden font-semibold px-6 py-3 rounded-xl text-slate-900">
+            <span class="absolute inset-0 rounded-xl bg-gradient-to-r from-cyan-400 via-fuchsia-400 to-amber-300" style="animation: holoPulse 3s ease-in-out infinite;"></span>
+            <span class="absolute inset-[2px] rounded-xl bg-slate-900" style="box-shadow: 0 0 20px rgba(56,189,248,0.35);"></span>
+            <span class="relative z-10 flex items-center gap-2 text-cyan-100">🚀 Run the Live Demo</span>
+          </button>
+          <button id="run-js" class="bg-amber-400/90 hover:bg-amber-300 text-slate-900 font-semibold px-4 py-2 rounded-lg transition">Run baseline (JS)</button>
+          <div class="text-sm text-slate-300">Real-time render for WASM; JS baseline runs headless and reports timing.</div>
         </div>
-        
-        <!-- Best Fitness -->
-        <div class="glass px-4 py-2 rounded-full flex items-center gap-3 shadow-xl border-white/10 backdrop-blur-xl animate-in fade-in slide-in-from-top-4 duration-500 delay-75">
-          <i data-lucide="trophy" class="w-3.5 h-3.5 text-emerald-400"></i>
-          <span id="best-display" class="text-xs font-mono font-medium text-emerald-200 tabular-nums">--</span>
+        <div class="text-xs text-slate-400 space-y-1">
+          <div><span class="text-emerald-200">WASM</span> uses the Rust CMA-ES with SIMD (if enabled); chart drives the visible step loop on a 2D surface.</div>
+          <div><span class="text-amber-200">Baseline JS</span> is a simple (μ+λ) strategy in vanilla JS for speed comparison.</div>
+          <div class="text-slate-400">Bounds/noise settings apply to the optimizer; visualization shows the 2D slice.</div>
+          <div id="timing" class="text-slate-200 font-semibold"></div>
         </div>
       </div>
 
-      <!-- Center Empty State -->
-      <div id="three-empty" class="absolute inset-0 flex flex-col items-center justify-center bg-black/40 backdrop-blur-sm z-10 transition-opacity duration-300">
-        <div class="w-20 h-20 bg-white/5 rounded-2xl flex items-center justify-center mb-6 animate-pulse border border-white/10 shadow-2xl rotate-3">
-          <i data-lucide="layers" class="w-10 h-10 text-slate-500"></i>
+      <div class="panel rounded-xl p-5 col-span-2 space-y-4 overflow-hidden">
+        <div class="flex justify-between items-center text-slate-300 text-sm">
+          <span>Best f(t)</span>
+          <span id="best-display">–</span>
         </div>
-        <h2 class="text-lg font-semibold text-white tracking-tight">Visualization Ready</h2>
-        <p class="text-sm text-slate-400 mt-2 mb-6 max-w-xs text-center leading-relaxed">
-          Configure your parameters in the sidebar or tap start to begin the simulation.
-        </p>
-        <button id="three-empty-run" class="px-6 py-2.5 bg-white/10 hover:bg-white/20 text-white text-sm font-medium rounded-full transition-all backdrop-blur-md border border-white/10 pointer-events-auto hover:scale-105 active:scale-95">
-          Start Optimization
-        </button>
-      </div>
-
-      <!-- Bottom Scrubber -->
-      <div class="absolute bottom-8 lg:bottom-8 left-6 right-6 lg:left-1/2 lg:-translate-x-1/2 lg:w-[400px] glass rounded-2xl p-2 flex items-center gap-4 opacity-0 transition-all duration-500 translate-y-4 pointer-events-auto z-20 shadow-2xl border-white/10" id="scrub-panel">
-        <button id="scrub-play" class="w-9 h-9 rounded-xl bg-indigo-600 hover:bg-indigo-500 flex items-center justify-center text-white shrink-0 transition-transform active:scale-90 shadow-lg">
-          <i data-lucide="play" class="w-4 h-4 ml-0.5 fill-current"></i>
-        </button>
-        <div class="flex-1 relative h-full flex items-center pr-2">
-          <input id="scrub" type="range" min="0" max="0" value="0" class="stripe-range accent-indigo-500" />
+        <svg id="line" class="chart w-full" viewBox="0 0 800 320"></svg>
+        <div class="flex justify-between items-center text-slate-300 text-sm">
+          <span>3D surface + candidates</span>
+          <span id="iter-display">Iter 0</span>
+        </div>
+        <div class="relative">
+          <canvas id="three-canvas" class="w-full h-[380px] rounded-lg"></canvas>
+          <div class="absolute bottom-2 left-2 right-2 flex items-center gap-2 text-xs text-slate-200">
+            <input id="scrub" type="range" min="0" max="0" value="0" class="w-full" />
+            <button id="scrub-play" class="px-2 py-1 rounded bg-slate-800">▶</button>
+          </div>
         </div>
       </div>
+    </section>
 
-      <!-- Chart Overlay (Bottom Right Desktop) -->
-      <div class="hidden lg:block absolute bottom-8 right-8 w-[360px] h-[180px] glass rounded-xl p-0 border border-white/10 shadow-2xl overflow-hidden backdrop-blur-md z-20">
-        <svg id="line" class="w-full h-full"></svg>
-        <div id="chart-empty" class="absolute inset-0 flex items-center justify-center text-slate-500 text-xs font-medium uppercase tracking-widest">
-          Waiting for data
+    <section class="grid lg:grid-cols-2 gap-4">
+      <div class="panel rounded-xl p-5 space-y-3">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-xs text-slate-400">Custom objective</p>
+            <h3 class="text-lg text-sky-100 font-semibold">Write your own f(x)</h3>
+          </div>
+          <button id="apply-custom" class="bg-emerald-400/90 hover:bg-emerald-300 text-slate-900 font-semibold px-3 py-2 rounded-lg transition">Use in WASM</button>
         </div>
+        <div class="text-xs text-slate-400">Function signature: <code>f(x: number[]): number</code>. Keep it deterministic for fair races.</div>
+        <div id="editor" class="w-full h-56 rounded-lg overflow-hidden border border-slate-700 bg-slate-900"></div>
       </div>
-    </div>
-  </main>
 
-
-  <!-- --- MOBILE SHEET (Cupertino) --- -->
-  <div id="cupertino-pane" class="hidden">
-    <div class="pt-2 pb-24 px-6 text-slate-200 space-y-8 h-full overflow-y-auto">
-      
-      <!-- Handle -->
-      <div class="w-10 h-1 bg-slate-700 rounded-full mx-auto mb-6"></div>
-
-      <!-- Run Button (Mobile) -->
-      <button id="run-mobile" class="w-full py-4 bg-gradient-to-r from-indigo-600 to-violet-600 text-white font-bold text-lg rounded-2xl shadow-xl shadow-indigo-500/20 active:scale-[0.98] transition-transform flex items-center justify-center gap-3 border border-white/10">
-        <i data-lucide="rocket" class="w-5 h-5"></i>
-        Run Optimization
-      </button>
-
-      <!-- Benchmark Picker -->
-      <div class="space-y-3">
-        <label class="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Benchmark</label>
-        <div class="grid grid-cols-2 gap-3" id="mobile-bench-grid">
-          <!-- Populated by JS -->
+      <div class="panel rounded-xl p-5 space-y-4">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-xs text-slate-400">Story mode</p>
+            <h3 class="text-lg text-amber-100 font-semibold">Guided CMA-ES</h3>
+          </div>
+          <div class="flex gap-2">
+            <button id="story-prev" class="px-3 py-2 rounded-lg bg-slate-800 text-slate-200">Prev</button>
+            <button id="story-next" class="px-3 py-2 rounded-lg bg-slate-800 text-slate-200">Next</button>
+            <button id="story-open" class="px-3 py-2 rounded-lg bg-amber-400/80 text-slate-900">Open</button>
+          </div>
         </div>
-        <select id="bench-mobile" class="hidden"></select>
+        <div id="story-text" class="text-slate-200 text-sm leading-relaxed">1) Sampling: CMA-ES draws λ candidates from a multivariate normal around the mean.</div>
       </div>
-
-      <!-- Parameters Sliders -->
-      <div class="space-y-6 bg-white/5 p-5 rounded-2xl border border-white/5">
-        <div class="space-y-4">
-           <div class="flex justify-between items-end">
-             <label class="text-xs font-bold text-slate-400 uppercase tracking-wider">Population (λ)</label>
-             <span id="lambda-display" class="text-sm font-mono text-indigo-400 font-bold">32</span>
-           </div>
-           <input id="lambda-slider" type="range" min="4" max="128" value="32" class="stripe-range" />
-           <input id="lambda-mobile" type="number" class="hidden" value="32">
-        </div>
-
-        <div class="space-y-4 pt-2">
-           <div class="flex justify-between items-end">
-             <label class="text-xs font-bold text-slate-400 uppercase tracking-wider">Step Size (σ)</label>
-             <span id="sigma-display" class="text-sm font-mono text-indigo-400 font-bold">1.2</span>
-           </div>
-           <input id="sigma-slider" type="range" min="0.1" max="5.0" step="0.1" value="1.2" class="stripe-range" />
-           <input id="sigma-mobile" type="number" class="hidden" value="1.2">
-        </div>
-      </div>
-
-      <!-- Toggles -->
-      <div class="flex flex-col gap-3">
-        <label class="flex items-center justify-between p-4 bg-white/5 rounded-xl border border-white/5 active:bg-white/10 transition-colors">
-           <span class="font-medium text-sm text-slate-200">Noisy Objective</span>
-           <input id="noisy-toggle-mobile" type="checkbox" class="w-5 h-5 accent-amber-500 rounded" />
-        </label>
-        
-        <label class="flex items-center justify-between p-4 bg-white/5 rounded-xl border border-white/5 active:bg-white/10 transition-colors">
-           <span class="font-medium text-sm text-slate-200">Constrained (Bounds)</span>
-           <input id="bounds-toggle-mobile" type="checkbox" class="w-5 h-5 accent-indigo-500 rounded" />
-        </label>
-      </div>
-
-      <!-- Hidden Sync Fields -->
-      <div class="hidden">
-        <div id="preset-gallery-mobile"></div>
-        <input id="iters-mobile" value="250">
-        <input id="seed-mobile" value="42">
-        <input id="bound-lo-mobile" value="-5">
-        <input id="bound-hi-mobile" value="5">
-        <select id="covar-model-mobile"><option value="auto">Auto</option></select>
-        <div id="recent-presets"></div><div id="recent-presets-mobile"></div>
-        <button id="chart-empty-sample"></button><button id="chart-empty-run"></button>
-      </div>
-
-    </div>
+    </section>
   </div>
 
-  <!-- --- HELP OVERLAY --- -->
-  <div id="help-overlay" class="fixed inset-0 z-[60] bg-slate-950/80 backdrop-blur-md hidden flex items-center justify-center p-4 transition-all duration-300 opacity-0 scale-95" tabindex="-1">
-    <div class="bg-slate-900 border border-white/10 rounded-2xl max-w-2xl w-full max-h-[90vh] flex flex-col shadow-2xl relative overflow-hidden">
-      <!-- Glow FX -->
-      <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-indigo-500 to-purple-500"></div>
-      
-      <button id="help-close-x" class="absolute top-4 right-4 p-2 text-slate-400 hover:text-white transition-colors rounded-lg hover:bg-white/5 z-10">
-        <i data-lucide="x" class="w-5 h-5"></i>
-      </button>
-      
-      <div class="p-6 border-b border-white/5 bg-slate-900/50">
-        <h2 class="text-lg font-bold text-white flex items-center gap-2">
-          <i data-lucide="keyboard" class="w-5 h-5 text-indigo-400"></i>
-          Keyboard Shortcuts
-        </h2>
-      </div>
-      
-      <div class="flex-1 overflow-y-auto p-6 space-y-6">
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div class="space-y-2">
-            <div class="flex items-center justify-between p-3 bg-white/5 rounded-lg border border-white/5">
-              <span class="text-xs font-medium text-slate-300">Run Optimization</span>
-              <kbd class="px-2 py-1 bg-white/10 rounded text-[10px] font-mono text-white border border-white/10">Space</kbd>
-            </div>
-            <div class="flex items-center justify-between p-3 bg-white/5 rounded-lg border border-white/5">
-              <span class="text-xs font-medium text-slate-300">Reset to Default</span>
-              <kbd class="px-2 py-1 bg-white/10 rounded text-[10px] font-mono text-white border border-white/10">R</kbd>
-            </div>
-            <div class="flex items-center justify-between p-3 bg-white/5 rounded-lg border border-white/5">
-              <span class="text-xs font-medium text-slate-300">Show/Hide Help</span>
-              <kbd class="px-2 py-1 bg-white/10 rounded text-[10px] font-mono text-white border border-white/10">H / ?</kbd>
-            </div>
-          </div>
-          
-          <div class="space-y-2">
-            <div class="flex items-center justify-between p-3 bg-white/5 rounded-lg border border-white/5">
-              <span class="text-xs font-medium text-slate-300">Share Config</span>
-              <div class="flex gap-1">
-                <kbd class="px-2 py-1 bg-white/10 rounded text-[10px] font-mono text-white border border-white/10">Ctrl</kbd>
-                <kbd class="px-2 py-1 bg-white/10 rounded text-[10px] font-mono text-white border border-white/10">S</kbd>
-              </div>
-            </div>
-            <div class="flex items-center justify-between p-3 bg-white/5 rounded-lg border border-white/5">
-              <span class="text-xs font-medium text-slate-300">Export CSV</span>
-              <div class="flex gap-1">
-                <kbd class="px-2 py-1 bg-white/10 rounded text-[10px] font-mono text-white border border-white/10">Ctrl</kbd>
-                <kbd class="px-2 py-1 bg-white/10 rounded text-[10px] font-mono text-white border border-white/10">E</kbd>
-              </div>
-            </div>
-          </div>
-        </div>
+  <div id="hud" class="fixed top-4 right-4 panel rounded-xl p-3 text-xs text-slate-200 space-y-1 min-w-[220px]">
+    <div class="flex justify-between"><span>FPS</span><span id="hud-fps">–</span></div>
+    <div class="flex justify-between"><span>WASM last run</span><span id="hud-wasm">–</span></div>
+    <div class="flex justify-between"><span>JS baseline</span><span id="hud-js">–</span></div>
+    <div class="flex justify-between"><span>Iter/sec (viz)</span><span id="hud-iter">–</span></div>
+  </div>
 
-        <div class="bg-indigo-950/30 border border-indigo-500/20 rounded-xl p-5">
-          <h3 class="text-xs font-bold text-indigo-300 mb-2 uppercase tracking-wider">About</h3>
-          <p class="text-xs text-slate-400 leading-relaxed">
-            This studio visualizes the <strong>CMA-ES</strong> (Covariance Matrix Adaptation Evolution Strategy) algorithm. The 3D ellipsoid represents the mutation distribution ($\mathcal{N}(0, C)$) scaled by step size $\sigma$.
-          </p>
-        </div>
-      </div>
-      
-      <div class="p-6 border-t border-white/5 flex justify-end gap-3 bg-slate-900/50">
-        <button id="start-tutorial" class="px-4 py-2 bg-white/5 hover:bg-white/10 text-slate-300 rounded-lg text-xs font-bold uppercase tracking-wide transition-colors">
-          Start Tutorial
-        </button>
-        <button id="help-close-btn" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-bold uppercase tracking-wide transition-colors shadow-lg shadow-indigo-500/20">
-          Close
-        </button>
+  <div id="race-results" class="fixed bottom-4 right-4 panel rounded-xl p-3 text-xs text-slate-200 space-y-1 min-w-[260px]"></div>
+
+  <div id="story-overlay" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-20 items-center justify-center">
+    <div class="panel rounded-xl p-6 max-w-xl space-y-3 text-slate-100">
+      <h3 class="text-xl font-semibold">CMA-ES story</h3>
+      <p id="story-overlay-text" class="text-sm"></p>
+      <div class="flex justify-end gap-2">
+        <button id="story-close" class="px-3 py-2 rounded-lg bg-slate-800 text-slate-200">Close</button>
       </div>
     </div>
   </div>
-
-  <!-- --- TUTORIAL OVERLAY --- -->
-  <div id="tutorial-overlay" class="fixed inset-0 z-[70] bg-slate-950/90 backdrop-blur-md hidden flex items-center justify-center p-6 transition-opacity duration-300">
-    <div class="bg-slate-900 border border-white/10 rounded-3xl max-w-md w-full shadow-2xl relative overflow-hidden p-1">
-        <div class="p-8 relative z-10 text-center space-y-6 bg-slate-900 rounded-[20px]">
-            <div class="w-16 h-16 bg-indigo-500/10 text-indigo-400 rounded-2xl flex items-center justify-center mx-auto mb-4 ring-1 ring-indigo-500/30 shadow-[0_0_30px_rgba(99,102,241,0.15)]">
-            <i data-lucide="graduation-cap" class="w-8 h-8"></i>
-            </div>
-            
-            <div class="space-y-2">
-            <h3 class="text-xl font-bold text-white tracking-tight">How it Works</h3>
-            <p id="tutorial-step-count" class="text-[10px] font-mono text-indigo-400 uppercase tracking-widest font-bold">Step 1 of 5</p>
-            </div>
-            
-            <p id="tutorial-content" class="text-slate-400 text-sm leading-relaxed min-h-[80px]">
-            Loading tutorial content...
-            </p>
-            
-            <div class="flex gap-3 pt-4">
-            <button id="tutorial-skip" class="flex-1 py-3 text-slate-500 hover:text-slate-300 text-xs font-bold uppercase tracking-wide transition-colors">Skip</button>
-            <div class="flex gap-2 flex-[2]">
-                <button id="tutorial-prev" class="flex-1 py-3 bg-white/5 hover:bg-white/10 text-white rounded-xl text-xs font-bold uppercase tracking-wide transition-colors border border-white/5">Back</button>
-                <button id="tutorial-next" class="flex-1 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold uppercase tracking-wide transition-colors shadow-lg shadow-indigo-500/25">Next</button>
-            </div>
-            </div>
-            
-            <button id="tutorial-close" class="absolute top-2 right-2 p-3 text-slate-500 hover:text-white transition-colors">
-            <i data-lucide="x" class="w-5 h-5"></i>
-            </button>
-        </div>
-    </div>
   </div>
 
-  <!-- --- TOASTS --- -->
-  <div id="toast-container" class="fixed top-6 left-1/2 -translate-x-1/2 z-[100] flex flex-col gap-3 w-full max-w-xs pointer-events-none"></div>
+  <script type="module">
+    import init, { WasmCmaes } from "../pkg/cmaes_wasm.js";
+    import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js";
+    import { OrbitControls } from "https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/controls/OrbitControls.js";
 
-  <!-- --- SCRIPTS --- -->
-  <script>
-    lucide.createIcons();
+    // Load lucide icon paths (fallback-safe)
+    let lucideIcons = {};
+    try {
+      const res = await fetch("https://unpkg.com/lucide-static@0.321.0/icons.json");
+      if (res.ok) lucideIcons = await res.json();
+    } catch (_) {
+      lucideIcons = {};
+    }
 
-    // --- UTILS ---
-    const vibrate = () => { if (navigator.vibrate) navigator.vibrate(10); };
-    const $ = (id) => document.getElementById(id);
+    // Monaco editor setup
+    const defaultCustomCode = `// Return a scalar fitness; lower is better
+function f(x) {
+  // Example: shifted bowl
+  const cx = 1.5, cy = -2.0;
+  const dx = x[0] - cx;
+  const dy = x[1] - cy;
+  return dx*dx + dy*dy + 0.1*Math.sin(3*dx) + 0.1*Math.cos(3*dy);
+}`;
+    let editor;
+    const monacoReady = new Promise((resolve) => {
+      window.require.config({ paths: { vs: "https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs" } });
+      window.require(["vs/editor/editor.main"], () => {
+        editor = monaco.editor.create(document.getElementById("editor"), {
+          value: defaultCustomCode,
+          language: "javascript",
+          theme: "vs-dark",
+          fontSize: 13,
+          minimap: { enabled: false },
+          automaticLayout: true,
+        });
+        resolve(editor);
+      });
+    });
 
-    // --- CUPERTINO PANE ---
-    let pane;
-    window.addEventListener('DOMContentLoaded', () => {
-      const el = document.getElementById('cupertino-pane');
-      el.classList.remove('hidden');
-      
-      pane = new CupertinoPane('#cupertino-pane', {
-        parentElement: 'body',
-        breaks: {
-            middle: { enabled: true, height: 480, bounce: true },
-            bottom: { enabled: true, height: 80 },
+    let customFn = (x) => x.reduce((s, v) => s + v * v, 0);
+
+    function safeCustom(x) {
+      try {
+        const v = customFn(x);
+        return Number.isFinite(v) ? v : 1e9;
+      } catch (e) {
+        console.warn('Custom fn error', e);
+        return 1e9;
+      }
+    }
+
+    function validateCustomCode(code) {
+      const banned = /(window|document|globalThis|Function|eval|import|fetch|Worker|XMLHttpRequest)/i;
+      if (banned.test(code)) throw new Error('Disallowed identifier detected');
+      if (code.length > 4000) throw new Error('Code too long');
+    }
+
+    const benchFns = {
+      sphere: {
+        title: "Sphere",
+        f: (x) => x[0] * x[0] + x[1] * x[1],
+        x0: [3, -2],
+      },
+      rastrigin: {
+        title: "Rastrigin",
+        f: (x) => {
+          const A = 10;
+          return 2 * A + x.reduce((s, xi) => s + (xi * xi - A * Math.cos(2 * Math.PI * xi)), 0);
         },
-        backdrop: true,
-        backdropOpacity: 0.6,
-        bottomClose: false,
-        buttonDestroy: false,
-        darkMode: true,
-        showDraggable: true,
-        dragBy: ['.pane', '.sheet-handle'], // handle added by library or custom? Library adds one if showDraggable true
-        onTransitionStart: (e) => { /* haptics? */ }
-      });
-      
-      const menuBtn = document.getElementById('mobile-menu-btn');
-      menuBtn.addEventListener('click', () => {
-          pane.present({ animate: true });
-          vibrate();
-      });
-    });
-
-    // --- SYNC LOGIC ---
-    const benches = [
-      { id: 'sphere', name: 'Sphere', color: 'from-blue-500 to-cyan-500' },
-      { id: 'rastrigin', name: 'Rastrigin', color: 'from-amber-500 to-orange-500' },
-      { id: 'ackley', name: 'Ackley', color: 'from-purple-500 to-pink-500' },
-      { id: 'griewank', name: 'Griewank', color: 'from-emerald-500 to-teal-500' },
-      { id: 'schwefel', name: 'Schwefel', color: 'from-red-500 to-rose-500' },
-      { id: 'levy', name: 'Levy', color: 'from-indigo-500 to-violet-500' }
-    ];
-    
-    const benchGrid = $('mobile-bench-grid');
-    const realBenchSelect = $('bench-mobile');
-
-    benches.forEach(b => {
-      const btn = document.createElement('button');
-      btn.className = `p-3 rounded-xl border border-white/5 bg-white/5 hover:bg-white/10 transition-all text-left relative overflow-hidden group`;
-      btn.innerHTML = `
-        <div class="absolute inset-0 opacity-0 group-hover:opacity-10 bg-gradient-to-br ${b.color} transition-opacity duration-300"></div>
-        <span class="relative z-10 text-xs font-bold text-slate-300 group-hover:text-white tracking-wide">${b.name}</span>
-        <div class="absolute bottom-0 left-0 h-0.5 w-full bg-gradient-to-r ${b.color} opacity-50"></div>
-      `;
-      
-      btn.addEventListener('click', () => {
-        realBenchSelect.value = b.id;
-        realBenchSelect.dispatchEvent(new Event('change'));
-        vibrate();
-        Array.from(benchGrid.children).forEach(c => c.classList.remove('ring-1', 'ring-indigo-500', 'bg-indigo-500/10'));
-        btn.classList.add('ring-1', 'ring-indigo-500', 'bg-indigo-500/10');
-      });
-      benchGrid.appendChild(btn);
-    });
-
-    // Slider Sync
-    const setupSlider = (sliderId, inputId, displayId) => {
-      const slider = $(sliderId);
-      const input = $(inputId);
-      const display = $(displayId);
-      
-      slider.addEventListener('input', () => {
-        input.value = slider.value;
-        input.dispatchEvent(new Event('change')); 
-        if (display) display.textContent = slider.value;
-        if (navigator.vibrate) navigator.vibrate(2);
-      });
-      
-      setInterval(() => {
-        if (input.value != slider.value) {
-          slider.value = input.value;
-          if (display) display.textContent = input.value;
-        }
-      }, 500);
+        x0: [3, -3],
+      },
+      ackley: {
+        title: "Ackley",
+        f: (x) => {
+          const a = 20, b = 0.2, c = 2 * Math.PI;
+          const sumSq = x.reduce((s, xi) => s + xi * xi, 0);
+          const sumCos = x.reduce((s, xi) => s + Math.cos(c * xi), 0);
+          return -a * Math.exp(-b * Math.sqrt(sumSq / x.length)) - Math.exp(sumCos / x.length) + a + Math.E;
+        },
+        x0: [2.5, -2.5],
+      },
+      griewank: {
+        title: "Griewank",
+        f: (x) => {
+          const sum = x.reduce((s, xi) => s + (xi * xi) / 4000, 0);
+          const prod = x.reduce((p, xi, i) => p * Math.cos(xi / Math.sqrt(i + 1)), 1);
+          return sum - prod + 1;
+        },
+        x0: [4, -3],
+      },
+      schwefel: {
+        title: "Schwefel",
+        f: (x) => {
+          const bias = 418.9829 * x.length;
+          const s = x.reduce((acc, xi) => acc + xi * Math.sin(Math.sqrt(Math.abs(xi))), 0);
+          return bias - s;
+        },
+        x0: [200, -150],
+      },
+      levy: {
+        title: "Levy",
+        f: (x) => {
+          const w = x.map((xi) => 1 + (xi - 1) / 4);
+          const term1 = Math.pow(Math.sin(Math.PI * w[0]), 2);
+          let sum = 0;
+          for (let i = 0; i < w.length - 1; i++) {
+            sum += Math.pow(w[i] - 1, 2) * (1 + 10 * Math.pow(Math.sin(Math.PI * w[i] + 1), 2));
+          }
+          const term3 = Math.pow(w[w.length - 1] - 1, 2) * (1 + Math.pow(Math.sin(2 * Math.PI * w[w.length - 1]), 2));
+          return term1 + sum + term3;
+        },
+        x0: [1.5, -1.5],
+      },
+      zakharov: {
+        title: "Zakharov",
+        f: (x) => {
+          const sum1 = x.reduce((s, xi) => s + xi * xi, 0);
+          const sum2 = x.reduce((s, xi, i) => s + 0.5 * (i + 1) * xi, 0);
+          return sum1 + Math.pow(sum2, 2) + Math.pow(sum2, 4);
+        },
+        x0: [2.0, -2.0],
+      },
+      alpine: {
+        title: "Alpine N1",
+        f: (x) => x.reduce((s, xi) => s + Math.abs(xi * Math.sin(xi) + 0.1 * xi), 0),
+        x0: [4.5, -4.0],
+      },
+      bukin6: {
+        title: "Bukin N.6",
+        f: (x) => {
+          const [x1, x2] = x;
+          return 100 * Math.sqrt(Math.abs(x2 - 0.01 * x1 * x1)) + 0.01 * Math.abs(x1 + 10);
+        },
+        x0: [-12, 2.5],
+      },
+      custom: {
+        title: "Custom",
+        f: (x) => safeCustom(x),
+        x0: [0, 0],
+      },
     };
 
-    setupSlider('lambda-slider', 'lambda-mobile', 'lambda-display');
-    setupSlider('sigma-slider', 'sigma-mobile', 'sigma-display');
+    // Inject lucide icons
+    document.querySelectorAll('.lucide').forEach((el) => {
+      const name = el.dataset.icon;
+      const path = lucideIcons[name];
+      if (!path) return;
+      el.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${path.join('')}</svg>`;
+    });
 
-    // --- SCRUBBER VISIBILITY ---
-    const iterDisplay = $('iter-display');
-    const scrubPanel = $('scrub-panel');
-    const observer = new MutationObserver(() => {
-      if (iterDisplay.textContent !== 'Iter 0') {
-         scrubPanel.style.opacity = '1';
-         scrubPanel.style.transform = 'translateY(0)';
-         scrubPanel.style.pointerEvents = 'auto';
+    const mustGet = (id) => {
+      const el = document.getElementById(id);
+      if (!el) throw new Error(`Missing DOM id: ${id}`);
+      return el;
+    };
+
+    const benchSelect = mustGet('bench');
+    const dimInput = mustGet('dim');
+    const dimLabel = mustGet('dim-label');
+    const projectionSelect = mustGet('projection');
+    const boundsToggle = mustGet('bounds-toggle');
+    const boundLo = mustGet('bound-lo');
+    const boundHi = mustGet('bound-hi');
+    const noiseSamples = mustGet('noise-samples');
+    const noiseMax = mustGet('noise-max');
+    const noiseAdaptive = mustGet('noise-adaptive');
+    const timingEl = mustGet('timing');
+    const raceResults = mustGet('race-results');
+
+    const lineSvg = d3.select('#line');
+    const scrub = mustGet('scrub');
+    const scrubPlay = mustGet('scrub-play');
+    const playbackState = { frames: [], playing: false, idx: 0 };
+    const lineMargin = { top: 10, right: 10, bottom: 30, left: 50 };
+    const width = 800, height = 320;
+
+    const lineG = lineSvg.append('g').attr('transform', `translate(${lineMargin.left},${lineMargin.top})`);
+
+    const lineX = d3.scaleLinear().range([0, width - lineMargin.left - lineMargin.right]);
+    const lineY = d3.scaleLog().clamp(true).range([height - lineMargin.top - lineMargin.bottom, 0]);
+
+    lineG.append('g').attr('class', 'axis axis-x').attr('transform', `translate(0,${height - lineMargin.top - lineMargin.bottom})`);
+    lineG.append('g').attr('class', 'axis axis-y');
+
+    const linePath = lineG.append('path').attr('fill', 'none').attr('stroke', '#38bdf8').attr('stroke-width', 2.5);
+
+    const statusEl = document.getElementById('status');
+    const bestEl = document.getElementById('best-display');
+    const iterEl = document.getElementById('iter-display');
+    const hudFps = document.getElementById('hud-fps');
+    const hudWasm = document.getElementById('hud-wasm');
+    const hudJs = document.getElementById('hud-js');
+    const hudIter = document.getElementById('hud-iter');
+
+    let wasmInitialized = false;
+
+    function currentDim(benchKey) {
+      dimInput.value = 2;
+      dimLabel.textContent = '2D surface view';
+      return 2;
+    }
+
+    function buildOptions(lambda, maxIter, seed, dim) {
+      const opts = { popsize: lambda, seed, maxEvals: lambda * maxIter };
+      if (boundsToggle.checked) {
+        const lo = Number(boundLo.value) || -5;
+        const hi = Number(boundHi.value) || 5;
+        opts.bounds = {
+          lower: new Float64Array(Array(dim).fill(lo)),
+          upper: new Float64Array(Array(dim).fill(hi)),
+        };
+      }
+      const samples = Number(noiseSamples.value) || 1;
+      const maxS = Number(noiseMax.value) || 8;
+      opts.noise = {
+        samplesPerPoint: samples,
+        maxSamplesPerPoint: maxS,
+        adaptive: noiseAdaptive.checked,
+      };
+      return opts;
+    }
+
+    function projectCandidates(cands, bestVec, dim) {
+      const mode = projectionSelect.value === 'auto' ? (dim > 2 ? 'pca' : 'first2') : projectionSelect.value;
+      if (dim <= 2 || mode === 'first2') {
+        const pts = cands.map((v) => ({ x: v[0], y: v[1] }));
+        const b = { x: bestVec[0], y: bestVec[1] };
+        return { pts, b };
+      }
+      const mean = Array(dim).fill(0);
+      cands.forEach((v) => v.forEach((val, i) => { mean[i] += val; }));
+      mean.forEach((_, i) => { mean[i] /= cands.length; });
+      const cov = Array.from({ length: dim }, () => Array(dim).fill(0));
+      cands.forEach((v) => {
+        for (let i = 0; i < dim; i++) {
+          const a = v[i] - mean[i];
+          for (let j = 0; j < dim; j++) cov[i][j] += a * (v[j] - mean[j]);
+        }
+      });
+      const denom = Math.max(1, cands.length - 1);
+      for (let i = 0; i < dim; i++) for (let j = 0; j < dim; j++) cov[i][j] /= denom;
+
+      const powerVec = (M) => {
+        let v = Array.from({ length: dim }, () => Math.random());
+        const norm = (arr) => Math.sqrt(arr.reduce((s, x) => s + x * x, 0));
+        for (let it = 0; it < 25; it++) {
+          const nv = Array(dim).fill(0);
+          for (let i = 0; i < dim; i++) {
+            for (let j = 0; j < dim; j++) nv[i] += M[i][j] * v[j];
+          }
+          const n = norm(nv) || 1;
+          v = nv.map((x) => x / n);
+        }
+        let lambda = 0;
+        for (let i = 0; i < dim; i++) for (let j = 0; j < dim; j++) lambda += v[i] * M[i][j] * v[j];
+        return { v, lambda };
+      };
+
+      const { v: v1, lambda: l1 } = powerVec(cov);
+      if (!isFinite(l1) || Math.abs(l1) < 1e-12) {
+        const pts = cands.map((v) => ({ x: v[0], y: v[1] }));
+        const b = { x: bestVec[0], y: bestVec[1] };
+        return { pts, b };
+      }
+      const cov2 = cov.map((row, i) => row.map((val, j) => val - l1 * v1[i] * v1[j]));
+      const { v: v2, lambda: l2 } = powerVec(cov2);
+      if (!isFinite(l2) || Math.abs(l2) < 1e-12) {
+        const pts = cands.map((v) => ({ x: v[0], y: v[1] }));
+        const b = { x: bestVec[0], y: bestVec[1] };
+        return { pts, b };
+      }
+
+      const project = (vec) => {
+        const centered = vec.map((x, i) => x - mean[i]);
+        const px = centered.reduce((s, x, i) => s + x * v1[i], 0);
+        const py = centered.reduce((s, x, i) => s + x * v2[i], 0);
+        return { x: px, y: py };
+      };
+
+      return { pts: cands.map(project), b: project(bestVec) };
+    }
+
+    // Three.js scene
+    const threeCanvas = mustGet('three-canvas');
+    const renderer = new THREE.WebGLRenderer({ canvas: threeCanvas, antialias: true, alpha: true });
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(50, 16/9, 0.1, 500);
+    camera.position.set(0, 40, 70);
+    const controls = new OrbitControls(camera, threeCanvas);
+    controls.enableDamping = true;
+    controls.autoRotate = true;
+    controls.autoRotateSpeed = 0.5;
+    scene.add(new THREE.AmbientLight(0x666666));
+    const dir = new THREE.DirectionalLight(0xffffff, 0.8);
+    dir.position.set(30, 50, 30);
+    scene.add(dir);
+
+    let surfaceMesh = null;
+    const surfaceGroup = new THREE.Group();
+    scene.add(surfaceGroup);
+    let pointsMesh = null;
+    let bestSphere = null;
+    let ellipseLine = null;
+
+    function viridis(t) {
+      // Simple viridis approximation
+      const a = [68, 1, 84], b = [59, 82, 139], c = [33, 145, 140], d = [94, 201, 98], e = [253, 231, 37];
+      const lerp = (p, q, s) => p + (q - p) * s;
+      const x = t;
+      let r, g, b2;
+      if (x < 0.25) { const s = x / 0.25; r = lerp(a[0], b[0], s); g = lerp(a[1], b[1], s); b2 = lerp(a[2], b[2], s); }
+      else if (x < 0.5) { const s = (x-0.25)/0.25; r = lerp(b[0], c[0], s); g = lerp(b[1], c[1], s); b2 = lerp(b[2], c[2], s); }
+      else if (x < 0.75) { const s = (x-0.5)/0.25; r = lerp(c[0], d[0], s); g = lerp(c[1], d[1], s); b2 = lerp(c[2], d[2], s); }
+      else { const s = (x-0.75)/0.25; r = lerp(d[0], e[0], s); g = lerp(d[1], e[1], s); b2 = lerp(d[2], e[2], s); }
+      return (Math.round(r) << 16) | (Math.round(g) << 8) | Math.round(b2);
+    }
+
+    function buildSurfaceGeometry(fn) {
+      const size = 40;
+      const segments = 80;
+      const geom = new THREE.PlaneGeometry(size, size, segments, segments);
+      const pos = geom.attributes.position;
+      let min = Infinity, max = -Infinity;
+      for (let i = 0; i < pos.count; i++) {
+        const x = pos.getX(i);
+        const y = pos.getY(i);
+        const z = fn([x / 2, y / 2]);
+        pos.setZ(i, z);
+        if (z < min) min = z;
+        if (z > max) max = z;
+      }
+      const colors = [];
+      for (let i = 0; i < pos.count; i++) {
+        const z = pos.getZ(i);
+        const t = (z - min) / (max - min + 1e-9);
+        const rgb = viridis(t);
+        colors.push(((rgb >> 16) & 255) / 255, ((rgb >> 8) & 255) / 255, (rgb & 255) / 255);
+      }
+      geom.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+      geom.rotateX(-Math.PI / 2);
+      return geom;
+    }
+
+    function updateSurface(fn) {
+      if (surfaceMesh) surfaceGroup.remove(surfaceMesh);
+      const geom = buildSurfaceGeometry(fn);
+      const mat = new THREE.MeshStandardMaterial({ vertexColors: true, side: THREE.DoubleSide, transparent: true, opacity: 0.9, roughness: 0.6, metalness: 0.0 });
+      surfaceMesh = new THREE.Mesh(geom, mat);
+      surfaceGroup.add(surfaceMesh);
+    }
+
+    function updatePoints(batch, mean) {
+      if (pointsMesh) surfaceGroup.remove(pointsMesh);
+      const geom = new THREE.BufferGeometry();
+      const arr = new Float32Array(batch.length * 3);
+      for (let i = 0; i < batch.length; i++) {
+        arr[i*3] = batch[i].x;
+        arr[i*3+1] = 0.05;
+        arr[i*3+2] = batch[i].y;
+      }
+      geom.setAttribute('position', new THREE.BufferAttribute(arr,3));
+      const mat = new THREE.PointsMaterial({ color: 0x38bdf8, size: 0.6 });
+      pointsMesh = new THREE.Points(geom, mat);
+      surfaceGroup.add(pointsMesh);
+
+      if (bestSphere) surfaceGroup.remove(bestSphere);
+      const sphereGeo = new THREE.SphereGeometry(0.6, 24, 24);
+      const sphereMat = new THREE.MeshStandardMaterial({ color: 0xfbbf24, emissive: 0xf59e0b, emissiveIntensity: 0.6 });
+      bestSphere = new THREE.Mesh(sphereGeo, sphereMat);
+      bestSphere.position.set(mean.x, 0.1, mean.y);
+      surfaceGroup.add(bestSphere);
+    }
+
+    function updateEllipse(mean, cov2x2) {
+      if (ellipseLine) surfaceGroup.remove(ellipseLine);
+      // Eigen decomposition of 2x2 covariance
+      const a = cov2x2[0], b = cov2x2[1], c = cov2x2[3];
+      const trace = a + c;
+      const det = a * c - b * b;
+      const disc = Math.max(trace*trace/4 - det, 0);
+      const l1 = trace/2 + Math.sqrt(disc);
+      const l2 = trace/2 - Math.sqrt(disc);
+      const rx = Math.sqrt(Math.max(l1, 1e-6));
+      const ry = Math.sqrt(Math.max(l2, 1e-6));
+      const angle = Math.atan2(b, l1 - a); // eigenvector for l1
+      const pts = [];
+      for (let i = 0; i <= 64; i++) {
+        const t = (i / 64) * Math.PI * 2;
+        const x = rx * Math.cos(t);
+        const y = ry * Math.sin(t);
+        const xr = x * Math.cos(angle) - y * Math.sin(angle);
+        const yr = x * Math.sin(angle) + y * Math.cos(angle);
+        pts.push(new THREE.Vector3(mean.x + xr, 0.05, mean.y + yr));
+      }
+      const geo = new THREE.BufferGeometry().setFromPoints(pts);
+      const mat = new THREE.LineDashedMaterial({ color: 0x38bdf8, dashSize: 0.5, gapSize: 0.3, transparent: true, opacity: 0.8 });
+      ellipseLine = new THREE.LineLoop(geo, mat);
+      ellipseLine.computeLineDistances();
+      surfaceGroup.add(ellipseLine);
+    }
+
+    function resizeRenderer() {
+      const w = threeCanvas.clientWidth || 800;
+      const h = 380;
+      renderer.setSize(w, h, false);
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+    }
+    resizeRenderer();
+    window.addEventListener('resize', resizeRenderer);
+
+    function renderThree() {
+      controls.update();
+      renderer.render(scene, camera);
+      requestAnimationFrame(renderThree);
+    }
+    renderThree();
+
+    function covFromPoints(batch, mean) {
+      if (!batch.length) return [1,0,0,1];
+      const n = batch.length;
+      let sxx=0, sxy=0, syy=0;
+      for (const p of batch) {
+        const dx = p.x - mean.x;
+        const dy = p.y - mean.y;
+        sxx += dx*dx;
+        sxy += dx*dy;
+        syy += dy*dy;
+      }
+      const denom = Math.max(1, n-1);
+      return [sxx/denom, sxy/denom, sxy/denom, syy/denom];
+    }
+
+    async function run() {
+      statusEl.textContent = 'Initializing wasm...';
+      if (!wasmInitialized) {
+        await init();
+        wasmInitialized = true;
+      }
+
+      const benchKey = benchSelect.value;
+      const bench = benchFns[benchKey];
+      const lambda = Number(document.getElementById('lambda').value) || 32;
+      const sigma = Number(document.getElementById('sigma').value) || 1.2;
+      const maxIter = Number(document.getElementById('iters').value) || 250;
+      const seed = Number(document.getElementById('seed').value) || 42;
+      const dim = currentDim(benchKey);
+      dimLabel.textContent = '2D surface view';
+
+      const opts = buildOptions(lambda, maxIter, seed, dim);
+
+      const x0 = new Float64Array(dim);
+      for (let i = 0; i < dim; i++) x0[i] = bench.x0[i % bench.x0.length] || 0;
+      const es = new WasmCmaes(x0, sigma, opts);
+
+      buildSurface(bench.f);
+
+      const history = [];
+      let iter = 0;
+      let bestF = Infinity;
+      let lastTs = performance.now();
+      let iterCounter = 0;
+      playbackState.frames = [];
+      playbackState.idx = 0;
+      scrub.max = 0;
+
+      const stepOnce = () => {
+        const lambda = es.lambda;
+        const candFlat = es.ask_flat();
+        const fits = new Float64Array(lambda);
+        const candidates = [];
+        for (let k = 0; k < lambda; k++) {
+          const offset = k * dim;
+          const v = candFlat.slice(offset, offset + dim);
+          candidates.push(Array.from(v));
+          fits[k] = bench.f(v);
+        }
+        es.tell_flat(fits);
+        const res = es.result();
+        const covArr = Array.from(es.cov_matrix());
+        const cov = [covArr[0], covArr[1], covArr[2], covArr[3]];
+        bestF = Math.min(bestF, res.best_f);
+        history.push({ iter, best: bestF });
+        iterCounter++;
+
+        const bestVec = Array.from(res.best_x());
+        const proj = projectCandidates(candidates, bestVec, dim);
+        render(history, proj.pts, res, proj.b);
+        // Store frame for scrub
+        const meanPt = { x: res.xmean()[0], y: res.xmean()[1] };
+        const covMat = Array.from(es.cov_matrix());
+        const cov = [covMat[0], covMat[1], covMat[2], covMat[3]];
+      if (playbackState.frames.length > 1000) playbackState.frames.shift();
+      playbackState.frames.push({
+        pts: proj.pts,
+        mean: meanPt,
+        cov,
+        best: proj.b,
+        bestF: res.best_f,
+          iter,
+        });
+        scrub.max = playbackState.frames.length - 1;
+
+        const delta = history.length > 1 ? history[history.length - 2].best - res.best_f : 0;
+        const boost = Math.max(1.0, Math.min(1.25, 1.0 + Math.abs(delta) * 2));
+        gsap.fromTo(bestEl, { scale: 1 }, { scale: boost, duration: 0.35, ease: 'sine.out' });
+
+        iter++;
+        const now = performance.now();
+        if (now - lastTs > 1000) {
+          document.getElementById('hud-iter').textContent = `${iterCounter} iter/s`;
+          iterCounter = 0;
+          lastTs = now;
+        }
+
+        if (!es.stop_status().stopped && iter < maxIter) {
+          requestAnimationFrame(stepOnce);
+        } else {
+          statusEl.textContent = `Done in ${iter} iterations / ${res.evals} evals`;
+          document.getElementById('hud-wasm').textContent = `${res.evals} evals`;
+        }
+      };
+
+      statusEl.textContent = `Running ${bench.title}...`;
+      requestAnimationFrame(stepOnce);
+    }
+
+    function runJsBaseline(dimOverride) {
+      const bench = benchFns[benchSelect.value];
+      const lambda = Number(document.getElementById('lambda').value) || 32;
+      const sigma0 = Number(document.getElementById('sigma').value) || 1.2;
+      const maxIter = Number(document.getElementById('iters').value) || 250;
+      const seed = Number(document.getElementById('seed').value) || 42;
+      const dim = dimOverride || 2;
+
+      const rng = (() => {
+        let state = BigInt(seed || 1);
+        return () => {
+          state = (6364136223846793005n * state + 1n) & ((1n << 64n) - 1n);
+          return Number(state >> 11n) / 9007199254740992;
+        };
+      })();
+
+      let mean = Array.from({ length: dim }, (_, i) => bench.x0[i % bench.x0.length] || 0);
+      let sigma = sigma0;
+      const sample = () => {
+        const z = [];
+        for (let i=0;i<dim;i++) {
+          const u1 = Math.max(1e-12, 1 - rng());
+          const u2 = 1 - rng();
+          const r = Math.sqrt(-2*Math.log(u1));
+          const th = 2*Math.PI*u2;
+          z.push(r*Math.cos(th));
+        }
+        return z.map((zi, i) => mean[i] + sigma * zi);
+      };
+
+      let bestF = Infinity;
+      let bestX = mean.slice();
+      const t0 = performance.now();
+      for (let iter=0; iter<maxIter; iter++) {
+        const cand = [];
+        for (let k=0;k<lambda;k++) {
+          const x = sample();
+          let f = bench.f(x);
+          if (boundsToggle.checked) {
+            const lo = Number(boundLo.value) || -5;
+            const hi = Number(boundHi.value) || 5;
+            let penalty = 0;
+            for (let i=0;i<dim;i++) {
+              let xi = x[i];
+              if (xi < lo) { penalty += (lo - xi) ** 2; xi = lo; }
+              else if (xi > hi) { penalty += (xi - hi) ** 2; xi = hi; }
+              x[i] = xi;
+            }
+            f += 1e3 * penalty;
+          }
+        cand.push({x,f});
+        if (f < bestF) { bestF = f; bestX = x; }
+      }
+        cand.sort((a,b)=>a.f-b.f);
+        const mu = Math.max(1, Math.floor(lambda/4));
+        mean = Array(dim).fill(0);
+        for (let i=0;i<mu;i++) {
+          for (let d=0; d<dim; d++) mean[d] += cand[i].x[d];
+        }
+        for (let d=0; d<dim; d++) mean[d] /= mu;
+        sigma *= 0.99;
+      }
+      const t1 = performance.now();
+      const msg = `Baseline JS: best f=${bestF.toExponential(3)} in ${(t1-t0).toFixed(1)} ms`;
+      timingEl.textContent = msg;
+      hudJs.textContent = msg;
+      return { bestF, ms: (t1-t0), bestX };
+    }
+
+    function render(hist, batch, res, projBest) {
+      if (!hist.length) return;
+      const xDomain = [0, d3.max(hist, (d) => d.iter) + 1];
+      const yMin = Math.max(1e-9, Math.min(...hist.map((d) => d.best)));
+      const yMax = d3.max(hist, (d) => d.best) || 1;
+      lineX.domain(xDomain);
+      lineY.domain([yMin, yMax]);
+
+      lineG.select('.axis-x').call(d3.axisBottom(lineX).ticks(8).tickSizeOuter(0));
+      lineG.select('.axis-y').call(d3.axisLeft(lineY).ticks(6, "~g"));
+
+      const lineGen = d3.line()
+        .x((d) => lineX(d.iter))
+        .y((d) => lineY(d.best))
+        .curve(d3.curveCatmullRom.alpha(0.6));
+      linePath.attr('d', lineGen(hist));
+
+        const meanPt = projBest || { x: res.best_x()[0], y: res.best_x()[1] };
+        updatePoints(batch, meanPt);
+        updateEllipse(meanPt, cov);
+
+      bestEl.textContent = `best f = ${res.best_f.toExponential(3)}`;
+      iterEl.textContent = `Iter ${hist[hist.length - 1].iter}`;
+    }
+
+    document.getElementById('run').addEventListener('click', run);
+    document.getElementById('run-js').addEventListener('click', () => runJsBaseline());
+    document.getElementById('run-race').addEventListener('click', async () => {
+      statusEl.textContent = 'Race: running WASM...';
+      const benchKey = benchSelect.value;
+      const bench = benchFns[benchKey];
+      const lambda = Number(document.getElementById('lambda').value) || 32;
+      const sigma = Number(document.getElementById('sigma').value) || 1.2;
+      const maxIter = Number(document.getElementById('iters').value) || 250;
+      const seed = Number(document.getElementById('seed').value) || 42;
+      const dim = currentDim(benchKey);
+      const opts = buildOptions(lambda, maxIter, seed, dim);
+      if (!wasmInitialized) { await init(); wasmInitialized = true; }
+      const x0 = new Float64Array(dim);
+      for (let i = 0; i < dim; i++) x0[i] = bench.x0[i % bench.x0.length] || 0;
+      const es = new WasmCmaes(x0, sigma, opts);
+      const t0 = performance.now();
+      while (!es.stop_status().stopped) {
+        const candFlat = es.ask_flat();
+        const fits = new Float64Array(es.lambda);
+        for (let k = 0; k < es.lambda; k++) {
+          const offset = k * dim;
+          fits[k] = bench.f(candFlat.slice(offset, offset + dim));
+        }
+        es.tell_flat(fits);
+        if (es.evals >= opts.maxEvals) break;
+      }
+      const wasmMs = performance.now() - t0;
+      const wasmRes = es.result();
+      hudWasm.textContent = `${wasmRes.evals} evals, ${wasmMs.toFixed(1)} ms`;
+
+      statusEl.textContent = 'Race: running JS baseline...';
+      const jsRes = runJsBaseline(dim);
+      raceResults.innerHTML = `<div class="font-semibold">Race results</div>
+        <div>WASM: f=${wasmRes.best_f.toExponential(3)}, ${wasmMs.toFixed(1)} ms</div>
+        <div>JS: f=${jsRes.bestF.toExponential(3)}, ${jsRes.ms.toFixed(1)} ms</div>`;
+      statusEl.textContent = 'Race complete';
+    });
+
+    dimInput.addEventListener('input', () => {
+      dimInput.value = 2;
+      dimLabel.textContent = '2D surface view';
+    });
+
+    const playLoop = () => {
+      if (!playbackState.playing || playbackState.frames.length === 0) return;
+      playbackState.idx = (playbackState.idx + 1) % playbackState.frames.length;
+      scrub.value = playbackState.idx;
+      const frame = playbackState.frames[playbackState.idx];
+      updatePoints(frame.pts, frame.mean);
+      updateEllipse(frame.mean, frame.cov);
+      iterEl.textContent = `Iter ${frame.iter}`;
+      bestEl.textContent = `best f = ${frame.bestF?.toExponential?.(3) ?? '–'}`;
+      requestAnimationFrame(playLoop);
+    };
+
+    scrub.addEventListener('input', () => {
+      const idx = Number(scrub.value) || 0;
+      playbackState.idx = idx;
+      const frame = playbackState.frames[idx];
+      if (frame) {
+        updatePoints(frame.pts, frame.mean);
+        updateEllipse(frame.mean, frame.cov);
+        iterEl.textContent = `Iter ${frame.iter}`;
+        bestEl.textContent = `best f = ${frame.bestF?.toExponential?.(3) ?? '–'}`;
       }
     });
-    observer.observe(iterDisplay, { childList: true, characterData: true, subtree: true });
 
-    // --- HELP ANIMATION ---
-    const helpOverlay = $('help-overlay');
-    const observerHelp = new MutationObserver((mutations) => {
-        mutations.forEach((mutation) => {
-            if (mutation.attributeName === 'class') {
-                const isHidden = helpOverlay.classList.contains('hidden');
-                if (!isHidden) {
-                    setTimeout(() => {
-                        helpOverlay.classList.remove('opacity-0', 'scale-95');
-                    }, 10);
-                } else {
-                    helpOverlay.classList.add('opacity-0', 'scale-95');
-                }
-            }
-        });
+    scrubPlay.addEventListener('click', () => {
+      playbackState.playing = !playbackState.playing;
+      scrubPlay.textContent = playbackState.playing ? '⏸' : '▶';
+      if (playbackState.playing) requestAnimationFrame(playLoop);
     });
-    if (helpOverlay) observerHelp.observe(helpOverlay, { attributes: true });
 
+    document.getElementById('apply-custom').addEventListener('click', async () => {
+      await monacoReady;
+      try {
+        const code = editor.getValue();
+        validateCustomCode(code);
+        const fn = new Function(`${code}; return f;`)();
+        if (typeof fn !== 'function') throw new Error('f is not a function');
+        customFn = fn;
+        benchSelect.value = 'custom';
+        statusEl.textContent = 'Custom objective applied';
+      } catch (e) {
+        alert('Invalid function: ' + e.message);
+      }
+    });
+
+    // Story mode
+    const storySteps = [
+      'Sampling: CMA-ES draws λ candidates from a multivariate normal around the mean.',
+      'Selection: rank candidates, take top μ with log weights.',
+      'Adaptation: update mean, covariance (full/sep/lm), and step size σ.',
+      'Stop: ftarget, max evals, TolFun/TolX, or ill-conditioned covariance.',
+      'Restarts: optional IPOP/BIPOP strategies to escape local minima.'
+    ];
+    let storyIdx = 0;
+    const storyText = document.getElementById('story-text');
+    const storyOverlay = document.getElementById('story-overlay');
+    const storyOverlayText = document.getElementById('story-overlay-text');
+    const updateStory = () => { storyText.textContent = storySteps[storyIdx]; };
+    updateStory();
+    const storyPrev = mustGet('story-prev');
+    const storyNext = mustGet('story-next');
+    const storyClose = mustGet('story-close');
+    storyPrev.addEventListener('click', () => { storyIdx = (storyIdx - 1 + storySteps.length) % storySteps.length; updateStory(); });
+    storyNext.addEventListener('click', () => { storyIdx = (storyIdx + 1) % storySteps.length; updateStory(); });
+    storyClose.addEventListener('click', () => storyOverlay.classList.add('hidden'));
+    storyText.addEventListener('click', () => { storyOverlayText.textContent = storySteps[storyIdx]; storyOverlay.classList.remove('hidden'); });
+    document.getElementById('story-open').addEventListener('click', () => { storyOverlayText.textContent = storySteps[storyIdx]; storyOverlay.classList.remove('hidden'); });
+
+    // FPS HUD
+    let lastFrame = performance.now();
+    let frames = 0;
+    const tick = () => {
+      frames++;
+      const now = performance.now();
+      if (now - lastFrame > 1000) {
+        hudFps.textContent = `${frames} fps`;
+        frames = 0;
+        lastFrame = now;
+      }
+      requestAnimationFrame(tick);
+    };
+    tick();
+
+    // Background Three.js particles
+    const canvas = document.getElementById('bg-canvas');
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1, 1000);
+    camera.position.z = 200;
+    const geometry = new THREE.BufferGeometry();
+    const COUNT = 800;
+    const positions = new Float32Array(COUNT * 3);
+    for (let i = 0; i < COUNT * 3; i++) positions[i] = (Math.random() - 0.5) * 400;
+    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    const material = new THREE.PointsMaterial({ color: 0x38bdf8, size: 1.6, transparent: true, opacity: 0.6 });
+    const points = new THREE.Points(geometry, material);
+    scene.add(points);
+
+    const animateBg = () => {
+      points.rotation.y += 0.0008;
+      points.rotation.x += 0.0004;
+      renderer.render(scene, camera);
+      requestAnimationFrame(animateBg);
+    };
+
+    // Optional 3D surface of the current benchmark (preview only, not exact scale)
+    let surface;
+    function buildSurface(fn) {
+      if (surface) scene.remove(surface);
+      const planeSize = 60;
+      const res = 40;
+      const geo = new THREE.PlaneGeometry(planeSize, planeSize, res, res);
+      const positions = geo.attributes.position;
+      for (let i = 0; i < positions.count; i++) {
+        const x = positions.getX(i) / 5; // shrink input
+        const y = positions.getY(i) / 5;
+        const z = -fn([x, y]);
+        positions.setZ(i, z);
+      }
+      positions.needsUpdate = true;
+      geo.computeVertexNormals();
+      const mat = new THREE.MeshStandardMaterial({
+        color: 0x38bdf8,
+        transparent: true,
+        opacity: 0.35,
+        side: THREE.DoubleSide,
+        flatShading: true,
+      });
+      surface = new THREE.Mesh(geo, mat);
+      surface.rotation.x = -Math.PI / 2;
+      scene.add(surface);
+    }
+
+    // Lights for the surface
+    const light1 = new THREE.PointLight(0x38bdf8, 1, 400);
+    light1.position.set(80, 120, 120);
+    scene.add(light1);
+    const light2 = new THREE.PointLight(0x6366f1, 0.7, 400);
+    light2.position.set(-60, 120, -80);
+    scene.add(light2);
+
+    const onResize = () => {
+      const w = window.innerWidth, h = window.innerHeight;
+      renderer.setSize(w, h);
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+    };
+    window.addEventListener('resize', onResize);
+    onResize();
+    animateBg();
+
+    // Subtle GSAP float on panels
+    gsap.utils.toArray('.panel').forEach((el, i) => {
+      gsap.to(el, { y: '+=6', duration: 3 + i * 0.2, repeat: -1, yoyo: true, ease: 'sine.inOut', delay: i * 0.1 });
+    });
   </script>
-
-  <!-- Load Logic -->
-  <script type="module" src="./app.js"></script>
 </body>
 </html>
