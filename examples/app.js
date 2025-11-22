@@ -723,32 +723,95 @@ function f(x) {
       }
     });
 
-    // Story mode
-    const storySteps = [
+    // Tutorial overlay (uses enhanced layout IDs)
+    const tutorialSteps = [
       'Sampling: CMA-ES draws λ candidates from a multivariate normal around the mean.',
       'Selection: rank candidates, take top μ with log weights.',
       'Adaptation: update mean, covariance (full/sep/lm), and step size σ.',
       'Stop: ftarget, max evals, TolFun/TolX, or ill-conditioned covariance.',
       'Restarts: optional IPOP/BIPOP strategies to escape local minima.'
     ];
-    let storyIdx = 0;
-    const storyText = document.getElementById('story-text');
-    const storyOverlay = document.getElementById('story-overlay');
-    const storyOverlayText = document.getElementById('story-overlay-text');
-    const updateStory = () => { storyText.textContent = storySteps[storyIdx]; };
-    updateStory();
-    const storyPrev = mustGet('story-prev');
-    const storyNext = mustGet('story-next');
-    const storyClose = mustGet('story-close');
-    storyPrev.addEventListener('click', () => { storyIdx = (storyIdx - 1 + storySteps.length) % storySteps.length; updateStory(); });
-    storyNext.addEventListener('click', () => { storyIdx = (storyIdx + 1) % storySteps.length; updateStory(); });
-    storyClose.addEventListener('click', () => storyOverlay.classList.add('hidden'));
-    storyText.addEventListener('click', () => { storyOverlayText.textContent = storySteps[storyIdx]; storyOverlay.classList.remove('hidden'); });
-    document.getElementById('story-open').addEventListener('click', () => { storyOverlayText.textContent = storySteps[storyIdx]; storyOverlay.classList.remove('hidden'); });
+    let tutorialIdx = 0;
+    const tutorialOverlay = document.getElementById('tutorial-overlay');
+    const tutorialContent = document.getElementById('tutorial-content');
+    const tutorialStepCount = document.getElementById('tutorial-step-count');
+    const tutorialPrev = document.getElementById('tutorial-prev');
+    const tutorialNext = document.getElementById('tutorial-next');
+    const tutorialClose = document.getElementById('tutorial-close');
+    const tutorialSkip = document.getElementById('tutorial-skip');
     const startTutorialBtn = document.getElementById('start-tutorial');
-    if (startTutorialBtn) startTutorialBtn.addEventListener('click', () => {
-      storyOverlayText.textContent = storySteps[storyIdx];
-      storyOverlay.classList.remove('hidden');
+
+    const renderTutorial = () => {
+      if (!tutorialContent || !tutorialStepCount) return;
+      tutorialContent.textContent = tutorialSteps[tutorialIdx];
+      tutorialStepCount.textContent = `Step ${tutorialIdx + 1} of ${tutorialSteps.length}`;
+    };
+    renderTutorial();
+
+    const openTutorial = () => {
+      if (tutorialOverlay) tutorialOverlay.classList.remove('hidden');
+      renderTutorial();
+    };
+    const closeTutorial = () => {
+      if (tutorialOverlay) tutorialOverlay.classList.add('hidden');
+    };
+
+    if (tutorialPrev) tutorialPrev.addEventListener('click', () => {
+      tutorialIdx = (tutorialIdx - 1 + tutorialSteps.length) % tutorialSteps.length;
+      renderTutorial();
+    });
+    if (tutorialNext) tutorialNext.addEventListener('click', () => {
+      tutorialIdx = (tutorialIdx + 1) % tutorialSteps.length;
+      renderTutorial();
+    });
+    if (tutorialClose) tutorialClose.addEventListener('click', closeTutorial);
+    if (tutorialSkip) tutorialSkip.addEventListener('click', closeTutorial);
+    if (startTutorialBtn) startTutorialBtn.addEventListener('click', openTutorial);
+
+    // Mobile bottom sheet controls + sync with desktop controls
+    const sheet = document.getElementById('mobile-sheet');
+    const handleBar = sheet?.querySelector('.handle-bar');
+    const closeSheet = document.getElementById('close-sheet');
+    const toggleAdvanced = document.getElementById('toggle-advanced');
+    const advancedOptions = document.getElementById('advanced-options');
+
+    const openSheet = () => sheet?.classList.add('open');
+    const closeSheetFn = () => sheet?.classList.remove('open');
+    const toggleSheet = () => sheet?.classList.toggle('open');
+
+    if (handleBar) handleBar.addEventListener('click', toggleSheet);
+    if (closeSheet) closeSheet.addEventListener('click', closeSheetFn);
+    if (toggleAdvanced && advancedOptions) {
+      toggleAdvanced.addEventListener('click', () => {
+        const hidden = advancedOptions.classList.toggle('hidden');
+        const arrow = toggleAdvanced.querySelector('svg');
+        if (arrow) arrow.style.transform = hidden ? 'rotate(0deg)' : 'rotate(180deg)';
+      });
+    }
+
+    const syncPairs = [
+      ['bench', 'bench-mobile'],
+      ['lambda', 'lambda-mobile'],
+      ['sigma', 'sigma-mobile'],
+      ['iters', 'iters-mobile'],
+      ['seed', 'seed-mobile'],
+    ];
+    syncPairs.forEach(([desktopId, mobileId]) => {
+      const d = document.getElementById(desktopId);
+      const m = document.getElementById(mobileId);
+      if (!d || !m) return;
+      const copy = (src, dst) => dst && (dst.value = src.value);
+      d.addEventListener('input', () => copy(d, m));
+      m.addEventListener('input', () => copy(m, d));
+      // initialize mobile with desktop defaults
+      copy(d, m);
+    });
+
+    // Mobile run button uses the same run pipeline then closes the sheet
+    const runMobileBtn = document.getElementById('run-mobile');
+    if (runMobileBtn) runMobileBtn.addEventListener('click', () => {
+      run();
+      closeSheetFn();
     });
 
     // FPS HUD
@@ -1134,4 +1197,3 @@ function f(x) {
     if (helpBtn) helpBtn.addEventListener('click', toggleHelp);
     if (helpCloseX) helpCloseX.addEventListener('click', toggleHelp);
     if (helpCloseBtn) helpCloseBtn.addEventListener('click', toggleHelp);
-
