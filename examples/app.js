@@ -245,6 +245,11 @@ function f(x) {
     const applyCustomBtn = mustGet('apply-custom');
     const toastContainer = mustGet('toast-container');
     const bgCanvas = mustGet('bg-canvas');
+    const pinRunBtn = mustGet('pin-run');
+    const compareLastBtn = mustGet('compare-last');
+    const clearOverlaysBtn = mustGet('clear-overlays');
+    const comparisonLegend = mustGet('comparison-legend');
+    const comparisonStats = mustGet('comparison-stats');
 
     const lineSvg = d3.select('#line');
     const scrub = mustGet('scrub');
@@ -254,6 +259,12 @@ function f(x) {
     // Module-level history and metadata for export functions
     let optimizationHistory = [];
     let currentRunMetadata = null;
+    let runCounter = 0;
+    const overlayPalette = ['#a855f7', '#22d3ee', '#f97316', '#f43f5e', '#22c55e', '#8b5cf6', '#14b8a6'];
+    let pastRuns = [];
+    let pinnedRunId = null;
+    let lastRunId = null;
+    let currentSummary = null;
 
     const lineMargin = { top: 10, right: 10, bottom: 30, left: 50 };
     const width = 800, height = 320;
@@ -267,6 +278,7 @@ function f(x) {
     lineG.append('g').attr('class', 'axis axis-y');
 
     const linePath = lineG.append('path').attr('fill', 'none').attr('stroke', '#38bdf8').attr('stroke-width', 2.5);
+    const overlayGroup = lineG.append('g').attr('class', 'overlay-lines');
 
     const statusEl = mustGet('status');
     const bestEl = mustGet('best-display');
@@ -774,6 +786,11 @@ function f(x) {
         } else {
           statusEl.textContent = `Done in ${iter} iterations / ${res.evals} evals`;
           hudWasm.textContent = `${res.evals} evals`;
+          currentSummary = summarizeRun(history, currentRunMetadata, res.best_f);
+          const record = addRunRecord(history, res);
+          pinnedRunId = pinnedRunId || record.id;
+          renderLegend();
+          renderStatsPanel(currentSummary);
         }
       };
 
@@ -852,10 +869,13 @@ function f(x) {
 
     function render(hist, batch, res, projBest, cov) {
       if (!hist.length) return;
-      const xDomain = [0, d3.max(hist, (d) => d.iter) + 1];
-      const yMin = Math.max(1e-9, Math.min(...hist.map((d) => d.best)));
-      const yMaxRaw = d3.max(hist, (d) => d.best) || 1;
+      const allHists = [hist, ...pastRuns.map((r) => r.hist)];
+      const flatBest = allHists.flatMap((h) => h.map((d) => d.best)).filter(Number.isFinite);
+      const yMin = Math.max(1e-9, Math.min(...flatBest));
+      const yMaxRaw = Math.max(...flatBest);
       const yMax = yMaxRaw <= yMin ? yMin * 1.05 + 1e-9 : yMaxRaw;
+      const maxIterAll = Math.max(...allHists.map((h) => (h.length ? h[h.length - 1].iter : 0)));
+      const xDomain = [0, maxIterAll + 1];
       lineX.domain(xDomain);
       lineY.domain([yMin, yMax]);
 
@@ -867,6 +887,30 @@ function f(x) {
         .y((d) => lineY(d.best))
         .curve(d3.curveCatmullRom.alpha(0.6));
       linePath.attr('d', lineGen(hist));
+
+      // overlay previous runs
+      const overlayLine = d3.line()
+        .x((d) => lineX(d.iter))
+        .y((d) => lineY(d.best))
+        .curve(d3.curveCatmullRom.alpha(0.6));
+
+      overlayGroup.selectAll('path.overlay-line')
+        .data(pastRuns, (d) => d.id)
+        .join(
+          (enter) => enter.append('path')
+            .attr('class', 'overlay-line')
+            .attr('fill', 'none')
+            .attr('stroke-width', (d) => d.id === pinnedRunId ? 3 : 1.5)
+            .attr('stroke', (d) => d.color)
+            .attr('opacity', (d) => d.id === pinnedRunId ? 0.9 : 0.5)
+            .attr('d', (d) => overlayLine(d.hist)),
+          (update) => update
+            .attr('stroke-width', (d) => d.id === pinnedRunId ? 3 : 1.5)
+            .attr('opacity', (d) => d.id === pinnedRunId ? 0.9 : 0.5)
+            .attr('stroke', (d) => d.color)
+            .attr('d', (d) => overlayLine(d.hist)),
+          (exit) => exit.remove()
+        );
 
       const meanPt = projBest || { x: res.best_x()[0], y: res.best_x()[1] };
       updatePoints(batch, meanPt);
@@ -1263,6 +1307,26 @@ function f(x) {
       showToast('JSON exported successfully', 'success');
     }
 
+    function summarizeRun(hist, metadata, fallbackBest) {
+      const bestValues = hist.map((h) => h.best).filter(Number.isFinite);
+      const n = bestValues.length || 1;
+      const mean = bestValues.reduce((a, b) => a + b, 0) / n;
+      const sorted = [...bestValues].sort((a, b) => a - b);
+      const mid = Math.floor(sorted.length / 2);
+      const median = sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+      const variance = bestValues.reduce((s, v) => s + (v - mean) ** 2, 0) / n;
+      const std = Math.sqrt(variance);
+      return {
+        best: bestValues[bestValues.length - 1] ?? fallbackBest,
+        mean,
+        median,
+        std,
+        bench: metadata?.benchmark || benchSelect.value,
+        lambda: metadata?.lambda || Number(lambdaInput.value),
+        sigma: metadata?.sigma || Number(sigmaInput.value),
+      };
+    }
+
     // Share configuration via URL
     function buildConfigURL(overrides = {}) {
       const params = new URLSearchParams({
@@ -1336,6 +1400,63 @@ function f(x) {
       }
     }
 
+    function renderStatsPanel(currentSummary) {
+      const pinned = pastRuns.find((r) => r.id === pinnedRunId);
+      const last = lastRunId ? pastRuns.find((r) => r.id === lastRunId) : null;
+
+      const toRow = (label, run) => {
+        if (!run || !run.summary) return `${label}: –`;
+        const parts = [
+          `${label}:`,
+          `best ${run.summary.best.toExponential(3)}`,
+          `mean ${run.summary.mean.toExponential(3)}`,
+          `median ${run.summary.median.toExponential(3)}`,
+          `std ${run.summary.std.toExponential(3)}`
+        ];
+        return parts.join(' | ');
+      };
+
+      const lines = [
+        toRow('Current', { summary: currentSummary }),
+        toRow('Pinned', pinned),
+        toRow('Last', last)
+      ];
+      comparisonStats.textContent = lines.join('   ');
+    }
+
+    function renderLegend() {
+      comparisonLegend.replaceChildren();
+      pastRuns.forEach((run) => {
+        const pill = document.createElement('div');
+        pill.className = 'px-3 py-1.5 rounded-full text-xs flex items-center gap-2 border border-slate-700';
+        const swatch = document.createElement('span');
+        swatch.style.backgroundColor = run.color;
+        swatch.className = 'w-3 h-3 rounded-full inline-block';
+        const text = document.createElement('span');
+        text.textContent = `${run.label} (${run.summary.best.toExponential(3)})`;
+        pill.append(swatch, text);
+        comparisonLegend.appendChild(pill);
+      });
+    }
+
+    function addRunRecord(hist, res) {
+      runCounter += 1;
+      const color = overlayPalette[(runCounter - 1) % overlayPalette.length];
+      const id = `run-${Date.now()}-${runCounter}`;
+      const summary = summarizeRun(hist, currentRunMetadata, res?.best_f);
+      const record = {
+        id,
+        label: `Run ${runCounter} · ${benchSelect.value}`,
+        hist: hist.map((d) => ({ ...d })), // clone
+        color,
+        summary
+      };
+      lastRunId = pastRuns.length ? pastRuns[pastRuns.length - 1].id : null;
+      pastRuns.push(record);
+      renderLegend();
+      renderStatsPanel(summary);
+      return record;
+    }
     // Keyboard shortcuts
     document.addEventListener('keydown', (e) => {
       // Don't trigger shortcuts when typing in inputs or Monaco editor
@@ -1462,6 +1583,38 @@ function f(x) {
     if (helpBtn) helpBtn.addEventListener('click', toggleHelp);
     if (helpCloseX) helpCloseX.addEventListener('click', toggleHelp);
     if (helpCloseBtn) helpCloseBtn.addEventListener('click', toggleHelp);
+
+    pinRunBtn.addEventListener('click', () => {
+      if (!pastRuns.length) {
+        showToast('No run to pin yet', 'warning');
+        return;
+      }
+      pinnedRunId = pastRuns[pastRuns.length - 1].id;
+      renderLegend();
+      renderStatsPanel(currentSummary);
+      showToast('Pinned latest run', 'info', 1500);
+    });
+
+    compareLastBtn.addEventListener('click', () => {
+      if (!lastRunId) {
+        showToast('No previous run to compare', 'warning');
+        return;
+      }
+      pinnedRunId = lastRunId;
+      renderLegend();
+      renderStatsPanel(currentSummary);
+      showToast('Comparing against last run', 'info', 1500);
+    });
+
+    clearOverlaysBtn.addEventListener('click', () => {
+      pastRuns = [];
+      pinnedRunId = null;
+      lastRunId = null;
+      overlayGroup.selectAll('path').remove();
+      comparisonLegend.replaceChildren();
+      comparisonStats.textContent = 'No comparison data yet';
+      showToast('Overlays cleared', 'info', 1200);
+    });
 
     // Register service worker for PWA/offline support (best-effort)
     if ('serviceWorker' in navigator) {

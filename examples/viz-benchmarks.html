@@ -541,6 +541,26 @@
             </div>
             <div id="recent-presets" class="flex flex-wrap gap-2"></div>
           </div>
+
+          <!-- Run comparisons -->
+          <div class="space-y-2 mt-4">
+            <div class="flex items-center justify-between gap-2">
+              <span class="text-sm font-medium text-slate-200">Run comparisons</span>
+            </div>
+            <div class="flex flex-wrap gap-2">
+              <button id="pin-run" class="px-3 py-2 rounded-lg bg-slate-800 text-slate-100 text-sm border border-slate-700 hover:border-sky-500">
+                Pin this run
+              </button>
+              <button id="compare-last" class="px-3 py-2 rounded-lg bg-slate-800 text-slate-100 text-sm border border-slate-700 hover:border-emerald-400">
+                Compare to last run
+              </button>
+              <button id="clear-overlays" class="px-3 py-2 rounded-lg bg-slate-900 text-slate-200 text-sm border border-slate-700 hover:border-red-400">
+                Clear overlays
+              </button>
+            </div>
+            <div id="comparison-legend" class="flex flex-wrap gap-2 text-xs text-slate-200"></div>
+            <div id="comparison-stats" class="text-xs text-slate-200 space-y-1"></div>
+          </div>
         </div>
 
         <!-- Parameter recommendations banner -->
