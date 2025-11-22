@@ -89,8 +89,8 @@
       <div class="grid sm:grid-cols-3 gap-3">
         <div class="panel rounded-xl p-4 flex flex-col gap-1">
           <div class="flex items-center gap-2 text-sky-200 text-xs"><span class="lucide" data-icon="cpu"></span>Bundle</div>
-          <p class="text-lg font-semibold text-sky-100">Sequential (pkg)</p>
-          <p class="text-xs text-slate-400">Swap to parallel by importing pkg-par in the script tag.</p>
+          <p id="bundle-label" class="text-lg font-semibold text-sky-100">Sequential (pkg)</p>
+          <button id="bundle-toggle" class="w-fit mt-1 text-xs px-3 py-1 rounded bg-slate-800 border border-slate-600 hover:border-sky-400 text-slate-200">Switch to parallel (reload)</button>
         </div>
         <div class="panel rounded-xl p-4 flex flex-col gap-1">
           <div class="flex items-center gap-2 text-amber-200 text-xs"><span class="lucide" data-icon="activity"></span>Rendering</div>
@@ -269,7 +269,8 @@
   </div>
 
   <script type="module">
-    import init, { WasmCmaes } from "../pkg/cmaes_wasm.js";
+    const bundle = (localStorage.getItem('cmaes-bundle') === 'pkg-par') ? 'pkg-par' : 'pkg';
+    const { default: init, WasmCmaes } = await import(`../${bundle}/cmaes_wasm.js`);
     import * as THREE from "three";
     import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 
@@ -482,6 +483,8 @@ function f(x) {
     const lineDot = lineG.append('circle').attr('r', 4).attr('fill', '#f59e0b').attr('stroke', '#0f172a').attr('stroke-width', 1).style('display', 'none');
 
     const statusEl = document.getElementById('status');
+    const bundleLabelEl = document.getElementById('bundle-label');
+    const bundleToggle = document.getElementById('bundle-toggle');
     const runButton = document.getElementById('run');
     const runLabel = runButton?.querySelector('.run-label');
     const bestEl = document.getElementById('best-display');
@@ -494,6 +497,19 @@ function f(x) {
     let wasmInitialized = false;
     let runActive = false;
     let lastRunFinished = false;
+
+    if (bundleLabelEl) {
+      const bundleName = bundle === 'pkg-par' ? 'Parallel (pkg-par)' : 'Sequential (pkg)';
+      bundleLabelEl.textContent = bundleName;
+    }
+    if (bundleToggle) {
+      bundleToggle.textContent = bundle === 'pkg-par' ? 'Switch to sequential (reload)' : 'Switch to parallel (reload)';
+      bundleToggle.addEventListener('click', () => {
+        const next = bundle === 'pkg-par' ? 'pkg' : 'pkg-par';
+        localStorage.setItem('cmaes-bundle', next);
+        location.reload();
+      });
+    }
 
     function currentDim(benchKey) {
       dimInput.value = 2;
