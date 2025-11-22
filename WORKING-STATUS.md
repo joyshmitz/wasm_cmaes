@@ -1,10 +1,10 @@
 # CMA-ES Project - Working Status
 
-## ✅ WHAT WORKS (100% Functional + Enhanced)
+## ✅ WHAT WORKS (CANONICAL)
 
-### File: `examples/viz-benchmarks.html` (FULLY WORKING WITH ENHANCEMENTS)
+### File: `examples/viz-benchmarks.html` (Canonical UI)
 
-This file is **COMPLETE and FUNCTIONAL** with ALL original features PLUS new enhancements:
+This is the default app, combining the rebuilt UI shell with the fully functional CMA-ES logic. All original features + enhancements work here.
 
 ### Original Features (100% Preserved):
 ✅ Full CMA-ES WebAssembly integration
@@ -38,24 +38,14 @@ This file is **COMPLETE and FUNCTIONAL** with ALL original features PLUS new enh
 
 ---
 
-## ❌ WHAT DOESN'T WORK
+## ♻️ BACKUPS / LEGACY
 
-### File: `examples/viz-benchmarks-enhanced.html` (Redirected)
+- `examples/viz-benchmarks-classic.html` — previous layout retained for reference/regression.
 
-This prototype shell had no JavaScript. It now **redirects to `viz-benchmarks.html`** so users don't land on a broken experience. Keeping it around for design reference only.
+## ℹ️ DEPRECATED
 
----
-
-### File: `examples/enhanced-app.js` (INCOMPLETE)
-
-This module provides enhancement features but:
-- ❌ Not connected to any HTML
-- ❌ Missing core CMA-ES logic
-- ❌ Missing benchmark functions
-- ❌ Missing 3D visualization code
-- ❌ Can't run standalone
-
-**STATUS: Partial library, needs integration**
+- `examples/viz-benchmarks-enhanced.html` — superseded; kept only as historical markup.
+- `examples/enhanced-app.js` — superseded by `examples/app.js` (canonical logic bundle).
 
 ---
 
