@@ -717,6 +717,12 @@ function f(x) {
       surfaceGroup.add(ellipseLine);
     }
 
+    const cov2x2FromFlat = (flat, dim) => {
+      if (!flat || flat.length < 4) return [1,0,0,1];
+      if (dim < 2) return [flat[0] ?? 1, 0, 0, flat[0] ?? 1];
+      return [flat[0], flat[1], flat[dim], flat[dim + 1]];
+    };
+
     function resizeRenderer() {
       const w = threeCanvas.clientWidth || 800;
       const h = 380;
@@ -786,25 +792,29 @@ function f(x) {
 
       const stepOnce = () => {
         const lambda = es.lambda;
+        const meanBefore = Array.from(es.xmean());
+        const covBeforeFlat = Array.from(es.cov_matrix());
         const candFlat = es.ask_flat();
         const fits = new Float64Array(lambda);
         const candidates = [];
+        let genBestF = Infinity;
+        let genBestVec = null;
         for (let k = 0; k < lambda; k++) {
           const offset = k * dim;
           const v = candFlat.slice(offset, offset + dim);
           candidates.push(Array.from(v));
           fits[k] = bench.f(v);
+          if (fits[k] < genBestF) { genBestF = fits[k]; genBestVec = candidates[candidates.length - 1]; }
         }
         es.tell_flat(fits);
         const res = es.result();
-        const covArr = Array.from(es.cov_matrix());
-        const cov = [covArr[0], covArr[1], covArr[2], covArr[3]];
+        const cov = cov2x2FromFlat(covBeforeFlat, dim);
         bestF = Math.min(bestF, res.best_f);
         history.push({ iter, best: bestF });
         iterCounter++;
 
-        const bestVec = Array.from(res.best_x());
-        const meanVec = Array.from(res.xmean());
+        const bestVec = genBestVec || Array.from(res.best_x());
+        const meanVec = meanBefore;
         const proj = projectCandidates(candidates, bestVec, dim);
         const meanPt = { x: meanVec[0], y: meanVec[1] };
         const bestPt = { x: proj.b.x, y: proj.b.y };
@@ -816,7 +826,7 @@ function f(x) {
           mean: meanPt,
           best: bestPt,
           cov,
-          bestF: res.best_f,
+          bestF: bestF,
           iter,
         });
         scrub.max = playbackState.frames.length - 1;
