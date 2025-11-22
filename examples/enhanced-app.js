@@ -386,6 +386,7 @@ const initKeyboardShortcuts = () => {
 
 const commands = [
   { id: 'run', title: 'Run Optimization', icon: '🚀', hotkey: 'Space', handler: () => runOptimization() },
+  { id: 'run-js', title: 'Run JS Baseline', icon: '🧪', handler: () => runJsBaselineOnly() },
   { id: 'tutorial', title: 'Start Tutorial', icon: '📚', hotkey: 'H', handler: () => startTutorial() },
   { id: 'sphere', title: 'Load Sphere Function', icon: '⚪', handler: () => loadBenchmark('sphere') },
   { id: 'rastrigin', title: 'Load Rastrigin Function', icon: '🎯', handler: () => loadBenchmark('rastrigin') },
@@ -395,6 +396,7 @@ const commands = [
   { id: 'share', title: 'Share Configuration', icon: '🔗', hotkey: 'Ctrl+S', handler: () => shareConfiguration() },
   { id: 'reset', title: 'Reset to Defaults', icon: '↺', hotkey: 'R', handler: () => resetToDefaults() },
   { id: 'theme', title: 'Toggle Dark/Light Mode', icon: '🌓', hotkey: 'T', handler: () => toggleTheme() },
+  { id: 'bounds', title: 'Toggle Bounds', icon: '📏', handler: () => toggleBounds() },
   { id: 'race', title: 'Run WASM vs JS Race', icon: '⚡', handler: () => runRace() },
   { id: 'capture', title: 'Capture 3D Screenshot', icon: '📷', handler: () => capture3D() },
   { id: 'export-chart', title: 'Export Chart as PNG', icon: '📊', handler: () => exportChart() }
@@ -779,6 +781,12 @@ const runOptimization = () => {
   if (runBtn) runBtn.click();
 };
 
+const runJsBaselineOnly = () => {
+  // Enhanced UI does not expose a standalone JS baseline button; reuse race handler
+  runRace();
+  showToast('Running JS baseline via race mode', 'info', 1800);
+};
+
 const runRace = () => {
   const raceBtn = mustGet('run-race');
   if (raceBtn) raceBtn.click();
@@ -824,6 +832,14 @@ const resetToDefaults = () => {
   if (boundsToggle) boundsToggle.checked = false;
 
   showToast('Reset to default values', 'info', 2000);
+};
+
+const toggleBounds = () => {
+  const boundsToggle = mustGet('bounds-toggle');
+  if (!boundsToggle) return;
+  boundsToggle.checked = !boundsToggle.checked;
+  boundsToggle.dispatchEvent(new Event('change'));
+  showToast(boundsToggle.checked ? 'Bounds enabled' : 'Bounds disabled', 'info', 1500);
 };
 
 const closeAllOverlays = () => {
