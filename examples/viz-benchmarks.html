@@ -653,7 +653,7 @@ function f(x) {
       surfaceGroup.add(surfaceMesh);
     }
 
-    function updatePoints(batch, mean) {
+    function updatePoints(batch, mean, best) {
       if (pointsMesh) {
         surfaceGroup.remove(pointsMesh);
         if (pointsMesh.geometry) pointsMesh.geometry.dispose();
@@ -679,7 +679,9 @@ function f(x) {
       const sphereGeo = new THREE.SphereGeometry(0.6, 24, 24);
       const sphereMat = new THREE.MeshStandardMaterial({ color: 0xfbbf24, emissive: 0xf59e0b, emissiveIntensity: 0.6 });
       bestSphere = new THREE.Mesh(sphereGeo, sphereMat);
-      bestSphere.position.set(mean.x, 0.1, mean.y);
+      const bx = best?.x ?? mean.x;
+      const by = best?.y ?? mean.y;
+      bestSphere.position.set(bx, 0.1, by);
       surfaceGroup.add(bestSphere);
     }
 
@@ -802,17 +804,19 @@ function f(x) {
         iterCounter++;
 
         const bestVec = Array.from(res.best_x());
+        const meanVec = Array.from(res.xmean());
         const proj = projectCandidates(candidates, bestVec, dim);
-        render(history, proj.pts, res, proj.b, cov);
+        const meanPt = { x: meanVec[0], y: meanVec[1] };
+        const bestPt = { x: proj.b.x, y: proj.b.y };
+        render(history, proj.pts, res, meanPt, cov, bestPt);
         // Store frame for scrub
-        const meanPt = { x: res.xmean()[0], y: res.xmean()[1] };
-      if (playbackState.frames.length > 1000) playbackState.frames.shift();
-      playbackState.frames.push({
-        pts: proj.pts,
-        mean: meanPt,
-        cov,
-        best: proj.b,
-        bestF: res.best_f,
+        if (playbackState.frames.length > 1000) playbackState.frames.shift();
+        playbackState.frames.push({
+          pts: proj.pts,
+          mean: meanPt,
+          best: bestPt,
+          cov,
+          bestF: res.best_f,
           iter,
         });
         scrub.max = playbackState.frames.length - 1;
@@ -939,13 +943,12 @@ function f(x) {
         .attr('cy', lineY(latest.best));
     }
 
-    function render(hist, batch, res, projBest, cov) {
+    function render(hist, batch, res, meanPt, cov, bestPt) {
       if (!hist.length) return;
       currentHist = hist;
       renderLine();
 
-      const meanPt = projBest || { x: res.best_x()[0], y: res.best_x()[1] };
-      updatePoints(batch, meanPt);
+      updatePoints(batch, meanPt, bestPt);
       if (cov) updateEllipse(meanPt, cov);
 
       bestEl.textContent = `best f = ${res.best_f.toExponential(3)}`;
@@ -998,7 +1001,7 @@ function f(x) {
 
     const showFrame = (frame) => {
       if (!frame) return;
-      updatePoints(frame.pts, frame.mean);
+      updatePoints(frame.pts, frame.mean, frame.best);
       updateEllipse(frame.mean, frame.cov);
       iterEl.textContent = `Iter ${frame.iter}`;
       bestEl.textContent = `best f = ${frame.bestF?.toExponential?.(3) ?? '–'}`;
