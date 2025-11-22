@@ -650,19 +650,31 @@
         </div>
 
         <!-- Projection mode -->
-        <div class="grid grid-cols-2 gap-3">
-          <div>
-            <label for="projection" class="block text-sm font-medium text-slate-300">Projection</label>
-            <select id="projection" class="w-full rounded-lg bg-slate-900 border border-slate-700 px-3 py-2 text-slate-100" disabled>
-              <option value="first2">First 2 dimensions</option>
-            </select>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label for="projection" class="block text-sm font-medium text-slate-300">Projection</label>
+              <select id="projection" class="w-full rounded-lg bg-slate-900 border border-slate-700 px-3 py-2 text-slate-100" disabled>
+                <option value="first2">First 2 dimensions</option>
+              </select>
+            </div>
+            <div>
+              <label for="covar-model" class="block text-sm font-medium text-slate-300">Covariance model</label>
+              <select id="covar-model" class="w-full rounded-lg bg-slate-900 border border-slate-700 px-3 py-2 text-slate-100">
+                <option value="auto" selected>Auto</option>
+                <option value="full">Full</option>
+                <option value="lm">Limited-memory</option>
+                <option value="sep">Separable</option>
+              </select>
+            </div>
           </div>
-          <div>
-            <label class="block text-sm font-medium text-slate-300">Race Mode</label>
-            <button id="run-race"
-                    class="w-full bg-fuchsia-500 hover:bg-fuchsia-400 text-slate-900 font-semibold px-3 py-2 rounded-lg transition"
-                    aria-label="Run speed comparison between WASM and JavaScript">
-              ⚡ WASM vs JS
+
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-sm font-medium text-slate-300">Race Mode</label>
+              <button id="run-race"
+                      class="w-full bg-fuchsia-500 hover:bg-fuchsia-400 text-slate-900 font-semibold px-3 py-2 rounded-lg transition"
+                      aria-label="Run speed comparison between WASM and JavaScript">
+                ⚡ WASM vs JS
             </button>
           </div>
         </div>
@@ -924,6 +936,18 @@
             </div>
           </div>
 
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label for="covar-model-mobile" class="block text-sm font-medium text-slate-300">Covariance model</label>
+              <select id="covar-model-mobile" class="w-full rounded-lg bg-slate-900 border border-slate-700 px-3 py-2 text-slate-100">
+                <option value="auto" selected>Auto</option>
+                <option value="full">Full</option>
+                <option value="lm">Limited-memory</option>
+                <option value="sep">Separable</option>
+              </select>
+            </div>
+          </div>
+
           <!-- More controls toggle -->
           <button id="toggle-advanced" class="w-full text-sm text-sky-400 hover:text-sky-300 flex items-center justify-center gap-1">
             <span>Advanced Options</span>
@@ -1101,6 +1125,7 @@
     <div class="flex justify-between"><span>WASM (last)</span><span id="hud-wasm" aria-live="polite">–</span></div>
     <div class="flex justify-between"><span>JS baseline</span><span id="hud-js" aria-live="polite">–</span></div>
     <div class="flex justify-between"><span>Iter/sec</span><span id="hud-iter" aria-live="polite">–</span></div>
+    <div class="flex justify-between"><span>Model</span><span id="hud-model" aria-live="polite">auto</span></div>
   </div>
 
   <!-- Race results (bottom-right overlay) -->

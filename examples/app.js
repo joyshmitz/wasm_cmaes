@@ -251,6 +251,7 @@ function f(x) {
     const sigmaInput = mustGet('sigma');
     const itersInput = mustGet('iters');
     const seedInput = mustGet('seed');
+    const covarModelSelect = mustGet('covar-model');
     const helpOverlay = document.getElementById('help-overlay');
     const helpCloseBtn = document.getElementById('help-close-btn');
     const helpCloseX = document.getElementById('help-close-x');
@@ -274,6 +275,7 @@ function f(x) {
     const parcoordsSvg = mustGet('param-parcoords');
     const paramRec = mustGet('param-recommendation');
     const paramRecText = mustGet('param-recommendation-text');
+    const hudModel = mustGet('hud-model');
 
     const lineSvg = d3.select('#line');
     const scrub = mustGet('scrub');
@@ -326,7 +328,7 @@ function f(x) {
     const getMobileEl = (id) => document.getElementById(`${id}-mobile`);
 
     function buildOptions(lambda, maxIter, seed, dim) {
-      const opts = { popsize: lambda, seed, maxEvals: lambda * maxIter };
+      const opts = { popsize: lambda, seed, maxEvals: lambda * maxIter, covarModel: covarModelSelect.value };
       if (boundsToggle.checked) {
         const lo = Number(boundLo.value) || -5;
         const hi = Number(boundHi.value) || 5;
@@ -355,6 +357,7 @@ function f(x) {
       bounds: getMobileEl('bounds-toggle'),
       lo: getMobileEl('bound-lo'),
       hi: getMobileEl('bound-hi'),
+      covar: getMobileEl('covar-model'),
     };
 
     const loadRecentPresets = () => {
@@ -1375,6 +1378,8 @@ function f(x) {
         lambda: metadata?.lambda || Number(lambdaInput.value),
         sigma: metadata?.sigma || Number(sigmaInput.value),
         cond,
+        model: metadata?.model || covarModelSelect.value,
+        evals: metadata?.evals || null,
       };
     }
 
@@ -1386,6 +1391,7 @@ function f(x) {
         sigma: overrides.sigma ?? sigmaInput.value,
         iters: overrides.iters ?? itersInput.value,
         seed: overrides.seed ?? seedInput.value,
+        model: overrides.model ?? covarModelSelect.value,
         bounds: overrides.boundsEnabled ?? boundsToggle.checked,
         lo: overrides.lo ?? boundLo.value,
         hi: overrides.hi ?? boundHi.value
@@ -1432,6 +1438,7 @@ function f(x) {
       if (params.has('sigma')) sigmaInput.value = params.get('sigma');
       if (params.has('iters')) itersInput.value = params.get('iters');
       if (params.has('seed')) seedInput.value = params.get('seed');
+      if (params.has('model')) covarModelSelect.value = params.get('model');
       if (params.has('bounds')) boundsToggle.checked = params.get('bounds') === 'true';
       if (params.has('lo')) boundLo.value = params.get('lo');
       if (params.has('hi')) boundHi.value = params.get('hi');
@@ -1442,6 +1449,7 @@ function f(x) {
       if (mobileRefs.sigma) mobileRefs.sigma.value = sigmaInput.value;
       if (mobileRefs.iters) mobileRefs.iters.value = itersInput.value;
       if (mobileRefs.seed) mobileRefs.seed.value = seedInput.value;
+      if (mobileRefs.covar) mobileRefs.covar.value = covarModelSelect.value;
       if (mobileRefs.bounds) mobileRefs.bounds.checked = boundsToggle.checked;
       if (mobileRefs.lo) mobileRefs.lo.value = boundLo.value;
       if (mobileRefs.hi) mobileRefs.hi.value = boundHi.value;
@@ -1462,7 +1470,8 @@ function f(x) {
           `best ${run.summary.best.toExponential(3)}`,
           `mean ${run.summary.mean.toExponential(3)}`,
           `median ${run.summary.median.toExponential(3)}`,
-          `std ${run.summary.std.toExponential(3)}`
+          `std ${run.summary.std.toExponential(3)}`,
+          `model ${run.summary.model || 'auto'}`
         ];
         return parts.join(' | ');
       };
@@ -1473,6 +1482,18 @@ function f(x) {
         toRow('Last', last)
       ];
       comparisonStats.textContent = lines.join('   ');
+
+      const pinnedBest = pinned?.summary?.best;
+      const pinnedEvals = pinned?.summary?.evals;
+      const deltaBest = pinnedBest != null && currentSummary?.best != null
+        ? currentSummary.best - pinnedBest
+        : null;
+      const deltaEvals = pinnedEvals != null && currentSummary?.evals != null
+        ? currentSummary.evals - pinnedEvals
+        : null;
+      const deltaStr = deltaBest != null ? `Δbest vs pinned: ${deltaBest >= 0 ? '+' : ''}${deltaBest.toExponential(3)}` : 'Δbest: –';
+      const evalStr = deltaEvals != null ? `Δevals: ${deltaEvals >= 0 ? '+' : ''}${deltaEvals}` : 'Δevals: –';
+      hudModel.textContent = `Model ${covarModelSelect.value} | ${deltaStr} | ${evalStr}`;
     }
 
     function renderLegend() {
@@ -1484,7 +1505,7 @@ function f(x) {
         swatch.style.backgroundColor = run.color;
         swatch.className = 'w-3 h-3 rounded-full inline-block';
         const text = document.createElement('span');
-        text.textContent = `${run.label} (${run.summary.best.toExponential(3)})`;
+        text.textContent = `${run.label} (${run.summary.best.toExponential(3)}) [${run.summary.model || 'auto'}]`;
         pill.append(swatch, text);
         comparisonLegend.appendChild(pill);
       });
@@ -1620,7 +1641,9 @@ function f(x) {
         benchmark: benchSelect.value,
         lambda: Number(lambdaInput.value),
         sigma: Number(sigmaInput.value),
+        model: covarModelSelect.value,
         stds: res?.stds ? Array.from(res.stds()) : undefined,
+        evals: res?.evals,
       };
       const summary = summarizeRun(hist, resMeta, res?.best_f);
       const record = {
@@ -1764,6 +1787,17 @@ function f(x) {
     if (helpBtn) helpBtn.addEventListener('click', toggleHelp);
     if (helpCloseX) helpCloseX.addEventListener('click', toggleHelp);
     if (helpCloseBtn) helpCloseBtn.addEventListener('click', toggleHelp);
+
+    covarModelSelect.addEventListener('change', () => {
+      if (mobileRefs.covar) mobileRefs.covar.value = covarModelSelect.value;
+      hudModel.textContent = `Model ${covarModelSelect.value}`;
+    });
+    if (mobileRefs.covar) {
+      mobileRefs.covar.addEventListener('change', () => {
+        covarModelSelect.value = mobileRefs.covar.value;
+        hudModel.textContent = `Model ${covarModelSelect.value}`;
+      });
+    }
 
     benchSelect.addEventListener('change', () => updateBenchRecommendation(benchSelect.value));
     if (mobileRefs.bench) {
