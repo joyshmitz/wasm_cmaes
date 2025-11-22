@@ -10,6 +10,9 @@
 
 # Node / bundler artifacts
 node_modules/
+playwright-report/
+test-results/
+*.log
 
 # Misc
 .DS_Store

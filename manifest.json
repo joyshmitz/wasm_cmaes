@@ -2,40 +2,26 @@
   "name": "CMA-ES WebAssembly Playground",
   "short_name": "CMA-ES WASM",
   "description": "Interactive optimization playground featuring CMA-ES compiled to WebAssembly with real-time 3D visualization",
-  "start_url": "/wasm_cmaes/",
+  "start_url": "./",
   "display": "standalone",
   "background_color": "#0c162a",
   "theme_color": "#38bdf8",
   "orientation": "any",
   "icons": [
     {
-      "src": "/wasm_cmaes/icon-192.png",
+      "src": "icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "/wasm_cmaes/icon-512.png",
+      "src": "icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
     }
   ],
   "categories": ["education", "utilities", "productivity"],
-  "screenshots": [
-    {
-      "src": "/wasm_cmaes/screenshot-desktop.png",
-      "sizes": "1280x720",
-      "type": "image/png",
-      "label": "Desktop view of CMA-ES optimization"
-    },
-    {
-      "src": "/wasm_cmaes/screenshot-mobile.png",
-      "sizes": "750x1334",
-      "type": "image/png",
-      "label": "Mobile view with bottom sheet controls"
-    }
-  ],
   "related_applications": [],
   "prefer_related_applications": false
 }

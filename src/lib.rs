@@ -1,11 +1,11 @@
-use wasm_bindgen::prelude::*;
 use js_sys::{Array, Float64Array, Function, Object, Reflect};
+use nalgebra::linalg::SymmetricEigen;
+use nalgebra::DMatrix;
+use serde::{Deserialize, Serialize};
+use serde_wasm_bindgen::{from_value, to_value};
 use std::cmp::Ordering;
 use std::f64;
-use nalgebra::DMatrix;
-use nalgebra::linalg::SymmetricEigen;
-use serde::{Serialize, Deserialize};
-use serde_wasm_bindgen::{to_value, from_value};
+use wasm_bindgen::prelude::*;
 
 #[cfg(target_arch = "wasm32")]
 use core::arch::wasm32::*;
@@ -30,16 +30,17 @@ struct LcgRng {
 
 impl LcgRng {
     fn new(seed: u64) -> Self {
-        let s = if seed == 0 { 0xdead_beef_cafe_babe } else { seed };
+        let s = if seed == 0 {
+            0xdead_beef_cafe_babe
+        } else {
+            seed
+        };
         Self { state: s }
     }
 
     #[inline]
     fn next_u64(&mut self) -> u64 {
-        self.state = self
-            .state
-            .wrapping_mul(6364136223846793005)
-            .wrapping_add(1);
+        self.state = self.state.wrapping_mul(6364136223846793005).wrapping_add(1);
         self.state
     }
 
@@ -82,8 +83,7 @@ unsafe fn norm_sq_wasm32_simd(a: &[f64]) -> f64 {
         acc = f64x2_add(acc, prod);
         i += 2;
     }
-    let mut s =
-        f64x2_extract_lane::<0>(acc) + f64x2_extract_lane::<1>(acc);
+    let mut s = f64x2_extract_lane::<0>(acc) + f64x2_extract_lane::<1>(acc);
     while i < len {
         s += a[i] * a[i];
         i += 1;
@@ -243,9 +243,7 @@ fn default_popsize(n: usize) -> usize {
 
 fn choose_covar_model(n: usize, opt: CovarianceModelOpt) -> CovarianceModelOpt {
     match opt {
-        CovarianceModelOpt::Full
-        | CovarianceModelOpt::Sep
-        | CovarianceModelOpt::Lm => opt,
+        CovarianceModelOpt::Full | CovarianceModelOpt::Sep | CovarianceModelOpt::Lm => opt,
         CovarianceModelOpt::Auto => {
             if n <= 20 {
                 CovarianceModelOpt::Full
@@ -341,9 +339,7 @@ fn parse_options(options: Option<JsValue>, dim: usize) -> Options {
         }
 
         // restart
-        if let Ok(v) =
-            Reflect::get(&obj, &JsValue::from_str("restartStrategy"))
-        {
+        if let Ok(v) = Reflect::get(&obj, &JsValue::from_str("restartStrategy")) {
             if let Some(s) = v.as_string() {
                 opts.restart.strategy = match s.as_str() {
                     "ipop" => RestartStrategyOpt::Ipop,
@@ -359,9 +355,7 @@ fn parse_options(options: Option<JsValue>, dim: usize) -> Options {
                 }
             }
         }
-        if let Ok(v) =
-            Reflect::get(&obj, &JsValue::from_str("maxTotalEvals"))
-        {
+        if let Ok(v) = Reflect::get(&obj, &JsValue::from_str("maxTotalEvals")) {
             if let Some(f) = v.as_f64() {
                 if f > 0.0 {
                     opts.restart.max_total_evals = Some(f as u64);
@@ -373,9 +367,7 @@ fn parse_options(options: Option<JsValue>, dim: usize) -> Options {
         if let Ok(v) = Reflect::get(&obj, &JsValue::from_str("bounds")) {
             if !v.is_undefined() && !v.is_null() {
                 let bobj = Object::from(v);
-                if let Ok(lo) =
-                    Reflect::get(&bobj, &JsValue::from_str("lower"))
-                {
+                if let Ok(lo) = Reflect::get(&bobj, &JsValue::from_str("lower")) {
                     if lo.is_instance_of::<Float64Array>() {
                         let arr = Float64Array::from(lo);
                         if arr.length() as usize == dim {
@@ -385,9 +377,7 @@ fn parse_options(options: Option<JsValue>, dim: usize) -> Options {
                         }
                     }
                 }
-                if let Ok(hi) =
-                    Reflect::get(&bobj, &JsValue::from_str("upper"))
-                {
+                if let Ok(hi) = Reflect::get(&bobj, &JsValue::from_str("upper")) {
                     if hi.is_instance_of::<Float64Array>() {
                         let arr = Float64Array::from(hi);
                         if arr.length() as usize == dim {
@@ -400,9 +390,7 @@ fn parse_options(options: Option<JsValue>, dim: usize) -> Options {
             }
         }
 
-        if let Ok(v) =
-            Reflect::get(&obj, &JsValue::from_str("constraintPenalty"))
-        {
+        if let Ok(v) = Reflect::get(&obj, &JsValue::from_str("constraintPenalty")) {
             if let Some(f) = v.as_f64() {
                 if f > 0.0 {
                     opts.constraint_penalty = f;
@@ -414,26 +402,19 @@ fn parse_options(options: Option<JsValue>, dim: usize) -> Options {
         if let Ok(v) = Reflect::get(&obj, &JsValue::from_str("noise")) {
             if !v.is_undefined() && !v.is_null() {
                 let nobj = Object::from(v);
-                if let Ok(sv) =
-                    Reflect::get(&nobj, &JsValue::from_str("samplesPerPoint"))
-                {
+                if let Ok(sv) = Reflect::get(&nobj, &JsValue::from_str("samplesPerPoint")) {
                     if let Some(f) = sv.as_f64() {
                         if f >= 1.0 {
                             opts.noise.base_samples = f as u32;
                         }
                     }
                 }
-                if let Ok(av) =
-                    Reflect::get(&nobj, &JsValue::from_str("adaptive"))
-                {
+                if let Ok(av) = Reflect::get(&nobj, &JsValue::from_str("adaptive")) {
                     if let Some(b) = av.as_bool() {
                         opts.noise.adaptive = b;
                     }
                 }
-                if let Ok(mv) = Reflect::get(
-                    &nobj,
-                    &JsValue::from_str("maxSamplesPerPoint"),
-                ) {
+                if let Ok(mv) = Reflect::get(&nobj, &JsValue::from_str("maxSamplesPerPoint")) {
                     if let Some(f) = mv.as_f64() {
                         if f >= 1.0 {
                             opts.noise.max_samples = f as u32;
@@ -488,8 +469,7 @@ impl CmaesParams {
         let mut raw_weights = vec![0.0; lambda];
         for i in 0..lambda {
             if i < mu {
-                raw_weights[i] =
-                    ((lambda as f64) / 2.0 + 0.5).ln() - ((i + 1) as f64).ln();
+                raw_weights[i] = ((lambda as f64) / 2.0 + 0.5).ln() - ((i + 1) as f64).ln();
             } else {
                 raw_weights[i] = 0.0;
             }
@@ -505,8 +485,7 @@ impl CmaesParams {
         }
         let mueff = weights[..mu].iter().sum::<f64>().powi(2) / tmp;
 
-        let cc = (4.0 + mueff / n as f64)
-            / (n as f64 + 4.0 + 2.0 * mueff / n as f64);
+        let cc = (4.0 + mueff / n as f64) / (n as f64 + 4.0 + 2.0 * mueff / n as f64);
         let cs = (mueff + 2.0) / (n as f64 + mueff + 5.0);
         let c1 = 2.0 / (((n as f64 + 1.3).powi(2)) + mueff);
         let cmu = {
@@ -514,7 +493,11 @@ impl CmaesParams {
             let den = ((n as f64 + 2.0).powi(2)) + mueff;
             let cmu_raw = num / den;
             let cap = 1.0 - c1;
-            if cmu_raw < cap { cmu_raw } else { cap }
+            if cmu_raw < cap {
+                cmu_raw
+            } else {
+                cap
+            }
         };
         let damps = 2.0 * mueff / lambda as f64 + 0.3 + cs;
         let lazy_gap_scale = match strategy {
@@ -522,9 +505,7 @@ impl CmaesParams {
             StrategyMode::Auto => 0.8,
         };
         let lazy_gap_evals =
-            lazy_gap_scale * n as f64 * lambda as f64
-                * (1.0 / (c1 + cmu))
-                / (n as f64 * n as f64);
+            lazy_gap_scale * n as f64 * lambda as f64 * (1.0 / (c1 + cmu)) / (n as f64 * n as f64);
 
         Self {
             n,
@@ -617,11 +598,7 @@ impl DecomposingPositiveMatrix {
         d
     }
 
-    fn update_eigensystem(
-        &mut self,
-        current_eval: f64,
-        lazy_gap_evals: f64,
-    ) {
+    fn update_eigensystem(&mut self, current_eval: f64, lazy_gap_evals: f64) {
         if current_eval <= self.updated_eval + lazy_gap_evals {
             return;
         }
@@ -771,8 +748,8 @@ impl CmaesFull {
         let params = CmaesParams::new(n, opts.popsize, opts.strategy);
         let lambda = params.lambda as u64;
         let max_evals = opts.max_evals.unwrap_or_else(|| {
-            let v = 100.0 * lambda as f64
-                + 150.0 * (n as f64 + 3.0).powi(2) * (lambda as f64).sqrt();
+            let v =
+                100.0 * lambda as f64 + 150.0 * (n as f64 + 3.0).powi(2) * (lambda as f64).sqrt();
             v as u64
         });
         let c = DecomposingPositiveMatrix::new(n);
@@ -806,9 +783,7 @@ impl CmaesFull {
         let mut y = vec![0.0; n];
         for _ in 0..lambda {
             for i in 0..n {
-                z[i] = self.sigma
-                    * self.c.eigenvalues[i].sqrt()
-                    * self.rng.next_normal();
+                z[i] = self.sigma * self.c.eigenvalues[i].sqrt() * self.rng.next_normal();
             }
             for i in 0..n {
                 let mut s = 0.0;
@@ -849,8 +824,7 @@ impl CmaesFull {
         }
         self.fitvals = fitvals_sorted;
         if let Some(first) = self.fitvals.first() {
-            self.best
-                .update(&arx_sorted[0], *first, self.counteval);
+            self.best.update(&arx_sorted[0], *first, self.counteval);
         }
 
         let mut new_xmean = vec![0.0; n];
@@ -892,8 +866,7 @@ impl CmaesFull {
         }
 
         let weight_sum: f64 = par.weights.iter().sum();
-        let c1a =
-            par.c1 * (1.0 - (1.0 - hsig * hsig) * par.cc * (2.0 - par.cc));
+        let c1a = par.c1 * (1.0 - (1.0 - hsig * hsig) * par.cc * (2.0 - par.cc));
         let factor = 1.0 - c1a - par.cmu * weight_sum;
         self.c.multiply_with(factor);
         self.c.add_outer(&self.pc, par.c1);
@@ -946,12 +919,7 @@ impl CmaesFull {
             }
         }
         if !self.c.eigenvalues.is_empty() {
-            let max_eig = self
-                .c
-                .eigenvalues
-                .iter()
-                .cloned()
-                .fold(0.0_f64, f64::max);
+            let max_eig = self.c.eigenvalues.iter().cloned().fold(0.0_f64, f64::max);
             if self.sigma * max_eig.sqrt() < 1e-11 {
                 res.stopped = true;
                 res.tolx = true;
@@ -960,22 +928,9 @@ impl CmaesFull {
         res
     }
 
-    fn result(
-        &self,
-    ) -> (
-        Vec<f64>,
-        f64,
-        u64,
-        u64,
-        u64,
-        Vec<f64>,
-        Vec<f64>,
-    ) {
+    fn result(&self) -> (Vec<f64>, f64, u64, u64, u64, Vec<f64>, Vec<f64>) {
         let stds_diag = self.c.diag();
-        let stds: Vec<f64> = stds_diag
-            .iter()
-            .map(|v| self.sigma * v.sqrt())
-            .collect();
+        let stds: Vec<f64> = stds_diag.iter().map(|v| self.sigma * v.sqrt()).collect();
         let iterations = self.counteval / self.params.lambda as u64;
         (
             self.best.x.clone(),
@@ -1012,8 +967,8 @@ impl CmaesSep {
         let params = CmaesParams::new(n, opts.popsize, opts.strategy);
         let lambda = params.lambda as u64;
         let max_evals = opts.max_evals.unwrap_or_else(|| {
-            let v = 100.0 * lambda as f64
-                + 150.0 * (n as f64 + 3.0).powi(2) * (lambda as f64).sqrt();
+            let v =
+                100.0 * lambda as f64 + 150.0 * (n as f64 + 3.0).powi(2) * (lambda as f64).sqrt();
             v as u64
         });
         let cov = DiagCovariance::new(n);
@@ -1079,8 +1034,7 @@ impl CmaesSep {
         }
         self.fitvals = fitvals_sorted;
         if let Some(first) = self.fitvals.first() {
-            self.best
-                .update(&arx_sorted[0], *first, self.counteval);
+            self.best.update(&arx_sorted[0], *first, self.counteval);
         }
 
         let mut new_xmean = vec![0.0; n];
@@ -1126,8 +1080,7 @@ impl CmaesSep {
         }
 
         let weight_sum: f64 = par.weights.iter().sum();
-        let c1a =
-            par.c1 * (1.0 - (1.0 - hsig * hsig) * par.cc * (2.0 - par.cc));
+        let c1a = par.c1 * (1.0 - (1.0 - hsig * hsig) * par.cc * (2.0 - par.cc));
         for i in 0..n {
             self.cov.diag[i] *= 1.0 - c1a - par.cmu * weight_sum;
             self.cov.diag[i] += par.c1 * self.pc[i] * self.pc[i];
@@ -1188,12 +1141,7 @@ impl CmaesSep {
                 }
             }
         }
-        let max_eig = self
-            .cov
-            .diag
-            .iter()
-            .cloned()
-            .fold(0.0_f64, f64::max);
+        let max_eig = self.cov.diag.iter().cloned().fold(0.0_f64, f64::max);
         if self.sigma * max_eig.sqrt() < 1e-11 {
             res.stopped = true;
             res.tolx = true;
@@ -1201,17 +1149,7 @@ impl CmaesSep {
         res
     }
 
-    fn result(
-        &self,
-    ) -> (
-        Vec<f64>,
-        f64,
-        u64,
-        u64,
-        u64,
-        Vec<f64>,
-        Vec<f64>,
-    ) {
+    fn result(&self) -> (Vec<f64>, f64, u64, u64, u64, Vec<f64>, Vec<f64>) {
         let stds: Vec<f64> = self
             .cov
             .diag
@@ -1256,8 +1194,8 @@ impl CmaesLm {
         let params = CmaesParams::new(n, opts.popsize, opts.strategy);
         let lambda = params.lambda as u64;
         let max_evals = opts.max_evals.unwrap_or_else(|| {
-            let v = 100.0 * lambda as f64
-                + 150.0 * (n as f64 + 3.0).powi(2) * (lambda as f64).sqrt();
+            let v =
+                100.0 * lambda as f64 + 150.0 * (n as f64 + 3.0).powi(2) * (lambda as f64).sqrt();
             v as u64
         });
         let cov = DiagCovariance::new(n);
@@ -1334,8 +1272,7 @@ impl CmaesLm {
         }
         self.fitvals = fitvals_sorted;
         if let Some(first) = self.fitvals.first() {
-            self.best
-                .update(&arx_sorted[0], *first, self.counteval);
+            self.best.update(&arx_sorted[0], *first, self.counteval);
         }
 
         let mut new_xmean = vec![0.0; n];
@@ -1401,8 +1338,7 @@ impl CmaesLm {
         }
 
         let weight_sum: f64 = par.weights.iter().sum();
-        let c1a =
-            par.c1 * (1.0 - (1.0 - hsig * hsig) * par.cc * (2.0 - par.cc));
+        let c1a = par.c1 * (1.0 - (1.0 - hsig * hsig) * par.cc * (2.0 - par.cc));
         for i in 0..n {
             self.cov.diag[i] *= 1.0 - c1a - par.cmu * weight_sum;
             self.cov.diag[i] += par.c1 * self.pc[i] * self.pc[i];
@@ -1463,12 +1399,7 @@ impl CmaesLm {
                 }
             }
         }
-        let max_eig = self
-            .cov
-            .diag
-            .iter()
-            .cloned()
-            .fold(0.0_f64, f64::max);
+        let max_eig = self.cov.diag.iter().cloned().fold(0.0_f64, f64::max);
         if self.sigma * max_eig.sqrt() < 1e-11 {
             res.stopped = true;
             res.tolx = true;
@@ -1476,17 +1407,7 @@ impl CmaesLm {
         res
     }
 
-    fn result(
-        &self,
-    ) -> (
-        Vec<f64>,
-        f64,
-        u64,
-        u64,
-        u64,
-        Vec<f64>,
-        Vec<f64>,
-    ) {
+    fn result(&self) -> (Vec<f64>, f64, u64, u64, u64, Vec<f64>, Vec<f64>) {
         let stds: Vec<f64> = self
             .cov
             .diag
@@ -1538,17 +1459,7 @@ impl Engine {
         }
     }
 
-    fn result(
-        &self,
-    ) -> (
-        Vec<f64>,
-        f64,
-        u64,
-        u64,
-        u64,
-        Vec<f64>,
-        Vec<f64>,
-    ) {
+    fn result(&self) -> (Vec<f64>, f64, u64, u64, u64, Vec<f64>, Vec<f64>) {
         match self {
             Engine::Full(e) => e.result(),
             Engine::Sep(e) => e.result(),
@@ -1726,11 +1637,7 @@ pub struct WasmCmaes {
 #[wasm_bindgen]
 impl WasmCmaes {
     #[wasm_bindgen(constructor)]
-    pub fn new(
-        xstart: &Float64Array,
-        sigma: f64,
-        options: Option<JsValue>,
-    ) -> WasmCmaes {
+    pub fn new(xstart: &Float64Array, sigma: f64, options: Option<JsValue>) -> WasmCmaes {
         let dim = xstart.length() as usize;
         let mut x = vec![0.0; dim];
         xstart.copy_to(&mut x);
@@ -1780,8 +1687,7 @@ impl WasmCmaes {
         self.batch_candidates.resize(lambda * dim, 0.0);
         for (k, x) in candidates.iter().enumerate() {
             let offset = k * dim;
-            self.batch_candidates[offset..offset + dim]
-                .copy_from_slice(&x[..]);
+            self.batch_candidates[offset..offset + dim].copy_from_slice(&x[..]);
         }
         Float64Array::from(self.batch_candidates.as_slice())
     }
@@ -1810,8 +1716,7 @@ impl WasmCmaes {
     }
 
     pub fn result(&self) -> FminResult {
-        let (best_x, best_f, evals_best, evals, iters, xmean, stds) =
-            self.engine.result();
+        let (best_x, best_f, evals_best, evals, iters, xmean, stds) = self.engine.result();
         FminResult::new(best_x, best_f, evals_best, evals, iters, xmean, stds)
     }
 
@@ -1860,8 +1765,7 @@ impl WasmCmaes {
             engine: self.engine.clone(),
             opts: self.opts.clone(),
         };
-        to_value(&st)
-            .map_err(|e| JsValue::from_str(&format!("serialize error: {:?}", e)))
+        to_value(&st).map_err(|e| JsValue::from_str(&format!("serialize error: {:?}", e)))
     }
 }
 
@@ -1885,14 +1789,9 @@ pub fn wasm_cmaes_from_state(state: &JsValue) -> Result<WasmCmaes, JsValue> {
 // JS Objective runner with constraints & noise
 // -------------------------------------------------------------------
 
-fn evaluate_objective_js(
-    x: &[f64],
-    objective: &Function,
-) -> Result<f64, JsValue> {
+fn evaluate_objective_js(x: &[f64], objective: &Function) -> Result<f64, JsValue> {
     let js_x = Float64Array::from(x);
-    let v = objective
-        .call1(&JsValue::NULL, &js_x)
-        .map_err(|e| e)?;
+    let v = objective.call1(&JsValue::NULL, &js_x).map_err(|e| e)?;
     v.as_f64()
         .ok_or_else(|| JsValue::from_str("objective must return a number"))
 }
@@ -1914,9 +1813,7 @@ fn run_cma_js_objective(
         for (k, x_candidate) in candidates.iter().enumerate() {
             let mut x_eval = x_candidate.clone();
             let mut penalty = 0.0;
-            if let (Some(lower), Some(upper)) =
-                (&opts.bounds_lower, &opts.bounds_upper)
-            {
+            if let (Some(lower), Some(upper)) = (&opts.bounds_lower, &opts.bounds_upper) {
                 for i in 0..dim {
                     let mut xi = x_eval[i];
                     if xi < lower[i] {
@@ -1931,17 +1828,14 @@ fn run_cma_js_objective(
                     x_eval[i] = xi;
                 }
             }
-            let samples =
-                compute_num_samples(k, lambda, &opts.noise) as usize;
+            let samples = compute_num_samples(k, lambda, &opts.noise) as usize;
             let mut sum_f = 0.0;
             for _ in 0..samples {
                 let js_x = Float64Array::from(x_eval.as_slice());
-                let v = objective
-                    .call1(&JsValue::NULL, &js_x)
-                    .map_err(|e| e)?;
-                let fx = v.as_f64().ok_or_else(|| {
-                    JsValue::from_str("objective must return a number")
-                })?;
+                let v = objective.call1(&JsValue::NULL, &js_x).map_err(|e| e)?;
+                let fx = v
+                    .as_f64()
+                    .ok_or_else(|| JsValue::from_str("objective must return a number"))?;
                 sum_f += fx;
             }
             let mean_f = sum_f / samples as f64;
@@ -2031,8 +1925,7 @@ pub fn fmin_js(
 
     run_cma_js_objective(&mut engine, objective, &opts, dim)?;
 
-    let (best_x, best_f, evals_best, evals, iters, xmean, stds) =
-        engine.result();
+    let (best_x, best_f, evals_best, evals, iters, xmean, stds) = engine.result();
     let fxmean = evaluate_objective_js(&xmean, objective)?;
     let (final_x, final_f) = if best_f < fxmean {
         (best_x, best_f)
@@ -2040,13 +1933,7 @@ pub fn fmin_js(
         (xmean.clone(), fxmean)
     };
     Ok(FminResult::new(
-        final_x,
-        final_f,
-        evals_best,
-        evals,
-        iters,
-        xmean,
-        stds,
+        final_x, final_f, evals_best, evals, iters, xmean, stds,
     ))
 }
 
@@ -2080,29 +1967,20 @@ pub fn fmin_builtin_js(
                 1 => sphere(x_candidate),
                 2 => tablet(x_candidate),
                 3 => rosenbrock(x_candidate),
-                _ => {
-                    return Err(JsValue::from_str(
-                        "invalid builtin objective id",
-                    ))
-                }
+                _ => return Err(JsValue::from_str("invalid builtin objective id")),
             };
             fits.push(f);
         }
         engine.tell(candidates, fits);
     }
 
-    let (best_x, best_f, evals_best, evals, iters, xmean, stds) =
-        engine.result();
+    let (best_x, best_f, evals_best, evals, iters, xmean, stds) = engine.result();
     let fxmean = match objective_id {
         0 => elli(&xmean),
         1 => sphere(&xmean),
         2 => tablet(&xmean),
         3 => rosenbrock(&xmean),
-        _ => {
-            return Err(JsValue::from_str(
-                "invalid builtin objective id",
-            ))
-        }
+        _ => return Err(JsValue::from_str("invalid builtin objective id")),
     };
     let (final_x, final_f) = if best_f < fxmean {
         (best_x, best_f)
@@ -2110,13 +1988,7 @@ pub fn fmin_builtin_js(
         (xmean.clone(), fxmean)
     };
     Ok(FminResult::new(
-        final_x,
-        final_f,
-        evals_best,
-        evals,
-        iters,
-        xmean,
-        stds,
+        final_x, final_f, evals_best, evals, iters, xmean, stds,
     ))
 }
 
@@ -2192,8 +2064,7 @@ pub fn fmin_restarts_js(
 
         let mut engine = create_engine(xstart_run, sigma, &opts, model);
         run_cma_js_objective(&mut engine, objective, &opts, dim)?;
-        let (best_x, best_f, evals_best, evals, iters, xmean, stds) =
-            engine.result();
+        let (best_x, best_f, evals_best, evals, iters, xmean, stds) = engine.result();
         global_evals_total += evals;
         global_iters_total += iters;
         let fxmean = evaluate_objective_js(&xmean, objective)?;
@@ -2238,6 +2109,7 @@ pub fn fmin_restarts_js(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use proptest::prelude::*;
 
     fn rastrigin(x: &[f64]) -> f64 {
         // Global optimum at 0^n with f = 0.
@@ -2258,8 +2130,7 @@ mod tests {
         let c = 2.0 * std::f64::consts::PI;
         let sum_sq = x.iter().map(|v| v * v).sum::<f64>();
         let sum_cos = x.iter().map(|v| (c * v).cos()).sum::<f64>();
-        -a * (-(b) * (1.0 / n * sum_sq).sqrt()).exp()
-            - (1.0 / n * sum_cos).exp()
+        -a * (-(b) * (1.0 / n * sum_sq).sqrt()).exp() - (1.0 / n * sum_cos).exp()
             + a
             + std::f64::consts::E
     }
@@ -2352,5 +2223,91 @@ mod tests {
         let x0 = vec![200.0, -150.0, 300.0];
         let best = run_cma(dim, x0, 300.0, schwefel, 1e-2, 300_000);
         assert!(best < 5.0, "best f = {}", best);
+    }
+
+    proptest! {
+        #![proptest_config(ProptestConfig { cases: 8, max_shrink_iters: 1_000, .. ProptestConfig::default() })]
+
+        #[test]
+        fn sphere_best_is_nonnegative(dim in 1usize..5, sigma in 0.3f64..1.5f64) {
+            let x0 = vec![1.0; dim];
+            let best = run_cma(dim, x0, sigma, sphere, 1e-6, 50_000);
+            prop_assert!(best >= 0.0);
+        }
+    }
+
+    #[test]
+    fn deterministic_seed_reproducible_full_model() {
+        let dim = 3;
+        let x0 = vec![1.0, -0.5, 0.25];
+        let sigma = 0.8;
+        let mut opts = Options::default();
+        opts.seed = 777;
+        opts.ftarget = Some(1e-6);
+        opts.max_evals = Some(80_000);
+        opts.covar_model = CovarianceModelOpt::Full;
+
+        let model = choose_covar_model(dim, opts.covar_model);
+        let mut engine1 = create_engine(x0.clone(), sigma, &opts, model);
+        let mut engine2 = create_engine(x0.clone(), sigma, &opts, model);
+
+        let objective = |x: &[f64]| sphere(x);
+
+        for _ in 0..3 {
+            let c1 = engine1.ask_candidates();
+            let fits1: Vec<f64> = c1.iter().map(|x| objective(x)).collect();
+            engine1.tell(c1, fits1);
+
+            let c2 = engine2.ask_candidates();
+            let fits2: Vec<f64> = c2.iter().map(|x| objective(x)).collect();
+            engine2.tell(c2, fits2);
+        }
+
+        let (b1, f1, _, _, _, _, _) = engine1.result();
+        let (b2, f2, _, _, _, _, _) = engine2.result();
+
+        assert!((f1 - f2).abs() < 1e-12, "best f mismatch {} vs {}", f1, f2);
+        for (a, b) in b1.iter().zip(b2.iter()) {
+            assert!((a - b).abs() < 1e-12, "x mismatch {} vs {}", a, b);
+        }
+    }
+
+    #[test]
+    fn respects_bounds_penalty_projection() {
+        let dim = 2;
+        let x0 = vec![5.0, -5.0];
+        let sigma = 1.5;
+        let mut opts = Options::default();
+        opts.bounds_lower = Some(vec![-1.0; dim]);
+        opts.bounds_upper = Some(vec![1.0; dim]);
+        opts.constraint_penalty = 1e3;
+        opts.max_evals = Some(30_000);
+        let model = choose_covar_model(dim, opts.covar_model);
+        let mut engine = create_engine(x0, sigma, &opts, model);
+
+        while !engine.stop_status().stopped {
+            let cand = engine.ask_candidates();
+            let fits: Vec<f64> = cand
+                .iter()
+                .map(|x| {
+                    let mut clipped = x.clone();
+                    let mut penalty = 0.0;
+                    for i in 0..dim {
+                        if clipped[i] < -1.0 {
+                            penalty += (-1.0 - clipped[i]).powi(2);
+                            clipped[i] = -1.0;
+                        } else if clipped[i] > 1.0 {
+                            penalty += (clipped[i] - 1.0).powi(2);
+                            clipped[i] = 1.0;
+                        }
+                    }
+                    sphere(&clipped) + opts.constraint_penalty * penalty
+                })
+                .collect();
+            engine.tell(cand, fits);
+        }
+
+        let (best_x, _, _, _, _, _, _) = engine.result();
+        assert!(best_x.iter().all(|v| *v >= -1.000_001 && *v <= 1.000_001));
     }
 }

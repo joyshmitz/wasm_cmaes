@@ -11,6 +11,7 @@ const STATIC_ASSETS = [
   '/wasm_cmaes/index.html',
   '/wasm_cmaes/examples/viz-benchmarks.html',
   '/wasm_cmaes/examples/viz-benchmarks-classic.html',
+  '/wasm_cmaes/examples/tailwind.css',
   '/wasm_cmaes/examples/app.js',
   '/wasm_cmaes/favicon.ico',
   '/wasm_cmaes/manifest.json',
@@ -25,7 +26,6 @@ const STATIC_ASSETS = [
 
 // CDN resources to cache (network-first strategy)
 const CDN_RESOURCES = [
-  'https://cdn.tailwindcss.com',
   'https://cdn.jsdelivr.net/npm/d3@7',
   'https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js',
   'https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js',

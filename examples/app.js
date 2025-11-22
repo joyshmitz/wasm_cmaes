@@ -153,7 +153,7 @@ function f(x) {
       custom: { lambda: 'Depends', sigma: 'Depends', tip: 'Check scaling; start with λ=32, σ=1.2.' }
     };
 
-    const quickstartSlides = [
+    const quickstartSlidesData = [
       { title: 'Pick a benchmark', body: 'Choose a test function and keep λ/σ defaults to see convergence behavior.' },
       { title: 'Run & scrub', body: 'Hit Run, then scrub the timeline to replay iterations and inspect candidates.' },
       { title: 'Race WASM vs JS', body: 'Use ⚡ Race to compare WebAssembly vs JS baseline; results show in the corner HUD.' },
@@ -161,22 +161,7 @@ function f(x) {
       { title: 'Learn mode', body: 'Toggle Learn mode to see annotated hotspots (controls, chart, 3D, HUD).' },
     ];
 
-    const glossaryItems = [
-      { term: 'λ (lambda)', desc: 'Population size per iteration. Higher = more exploration but more evals.' },
-      { term: 'σ (sigma)', desc: 'Step size; scales the search distribution. Increase to escape plateaus.' },
-      { term: 'Bounds', desc: 'Optional lower/upper limits; violations are penalized in fitness.' },
-      { term: 'Condition number', desc: 'Ratio of largest to smallest eigenvalue of covariance; high values mean the search ellipsoid is elongated/ill-conditioned.' },
-    ];
-
-    const quickstartSlides = [
-      { title: 'Pick a benchmark', body: 'Choose a test function and keep λ/σ defaults to see convergence behavior.' },
-      { title: 'Run & scrub', body: 'Hit Run, then scrub the timeline to replay iterations and inspect candidates.' },
-      { title: 'Race WASM vs JS', body: 'Use ⚡ Race to compare WebAssembly vs JS baseline; results show in the corner HUD.' },
-      { title: 'Share & presets', body: 'Copy a share link or tap a preset to load tuned λ/σ/bounds for tricky landscapes.' },
-      { title: 'Learn mode', body: 'Toggle Learn mode to see annotated hotspots (controls, chart, 3D, HUD).' },
-    ];
-
-    const glossaryItems = [
+    const glossaryItemsData = [
       { term: 'λ (lambda)', desc: 'Population size per iteration. Higher = more exploration but more evals.' },
       { term: 'σ (sigma)', desc: 'Step size; scales the search distribution. Increase to escape plateaus.' },
       { term: 'Bounds', desc: 'Optional lower/upper limits; violations are penalized in fitness.' },
@@ -247,10 +232,10 @@ function f(x) {
 
     function renderQuickstart() {
       if (!quickstartContent || !quickstartDots) return;
-      const slide = quickstartSlides[quickstartIdx % quickstartSlides.length];
+      const slide = quickstartSlidesData[quickstartIdx % quickstartSlidesData.length];
       quickstartContent.innerHTML = `<div class="font-semibold text-sky-100 mb-1">${slide.title}</div><div>${slide.body}</div>`;
       quickstartDots.replaceChildren();
-      quickstartSlides.forEach((_, i) => {
+      quickstartSlidesData.forEach((_, i) => {
         const dot = document.createElement('button');
         dot.className = `w-2.5 h-2.5 rounded-full ${i === quickstartIdx ? 'bg-sky-400' : 'bg-slate-700'}`;
         dot.addEventListener('click', () => { quickstartIdx = i; renderQuickstart(); });
@@ -261,7 +246,7 @@ function f(x) {
     function renderGlossary() {
       if (!glossaryList) return;
       glossaryList.replaceChildren();
-      glossaryItems.forEach((item) => {
+      glossaryItemsData.forEach((item) => {
         const li = document.createElement('li');
         li.innerHTML = `<span class="font-semibold text-sky-200">${item.term}:</span> <span class="text-slate-300">${item.desc}</span>`;
         glossaryList.appendChild(li);
@@ -342,7 +327,6 @@ function f(x) {
     const noiseSamples = mustGet('noise-samples');
     const noiseMax = mustGet('noise-max');
     const noiseAdaptive = mustGet('noise-adaptive');
-    const noisyToggle = mustGet('noisy-toggle');
     const constraintStrategySelect = document.getElementById('constraint-strategy');
     const resampleCapInput = document.getElementById('resample-cap');
     const penaltyWeightInput = document.getElementById('penalty-weight');
@@ -402,9 +386,7 @@ function f(x) {
     const parcoordsAxes = ['lambda', 'sigma', 'cond', 'best'];
     let lastImproveIter = 0;
     let stallNotified = false;
-    let quickstartIdx = 0;
-    let learnModeOn = false;
-    let learnBadges = [];
+    // quickstartIdx, learnModeOn, learnBadges already declared above
 
     function constraintConfig() {
       return {
@@ -2012,8 +1994,8 @@ function f(x) {
     }
 
     if (quickstartPrev && quickstartNext) {
-      quickstartPrev.addEventListener('click', () => { quickstartIdx = (quickstartIdx - 1 + quickstartSlides.length) % quickstartSlides.length; renderQuickstart(); });
-      quickstartNext.addEventListener('click', () => { quickstartIdx = (quickstartIdx + 1) % quickstartSlides.length; renderQuickstart(); });
+      quickstartPrev.addEventListener('click', () => { quickstartIdx = (quickstartIdx - 1 + quickstartSlidesData.length) % quickstartSlidesData.length; renderQuickstart(); });
+      quickstartNext.addEventListener('click', () => { quickstartIdx = (quickstartIdx + 1) % quickstartSlidesData.length; renderQuickstart(); });
     }
 
     if (learnToggle) {

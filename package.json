@@ -1,0 +1,16 @@
+{
+  "name": "wasm_cmaes",
+  "version": "0.2.0",
+  "type": "module",
+  "scripts": {
+    "build:css": "tailwindcss -i ./examples/tw-input.css -o ./examples/tailwind.css --minify --content \"./examples/**/*.html\" \"./examples/**/*.js\"",
+    "test:node": "node examples/tests/node-smoke.test.mjs",
+    "e2e": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.48.2",
+    "http-server": "^14.1.1",
+    "tailwindcss": "^3.4.10",
+    "typescript": "^5.4.0"
+  }
+}
