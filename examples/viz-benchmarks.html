@@ -191,14 +191,14 @@
           <button id="run" class="relative overflow-hidden font-semibold px-6 py-3 rounded-xl text-slate-900">
             <span class="absolute inset-0 rounded-xl bg-gradient-to-r from-cyan-400 via-fuchsia-400 to-amber-300" style="animation: holoPulse 3s ease-in-out infinite;"></span>
             <span class="absolute inset-[2px] rounded-xl bg-slate-900" style="box-shadow: 0 0 20px rgba(56,189,248,0.35);"></span>
-            <span class="relative z-10 flex items-center gap-2 text-cyan-100">🚀 Run the Live Demo</span>
+            <span class="relative z-10 flex items-center gap-2 text-cyan-100">🚀 Run the Live Demo (WASM)</span>
           </button>
-          <button id="run-js" class="bg-amber-400/90 hover:bg-amber-300 text-slate-900 font-semibold px-4 py-2 rounded-lg transition">Run baseline (JS)</button>
-          <div class="text-sm text-slate-300">Real-time render for WASM; JS baseline runs headless and reports timing.</div>
+          <button id="run-race" class="bg-amber-400/90 hover:bg-amber-300 text-slate-900 font-semibold px-4 py-2 rounded-lg transition">Race WASM vs JS</button>
+          <div class="text-sm text-slate-300">Race compares the rendered WASM run to a headless vanilla-JS baseline and reports both timings.</div>
         </div>
-        <div class="text-xs text-slate-400 space-y-1">
+          <div class="text-xs text-slate-400 space-y-1">
           <div><span class="text-emerald-200">WASM</span> uses the Rust CMA-ES with SIMD (if enabled); chart drives the visible step loop on a 2D surface.</div>
-          <div><span class="text-amber-200">Baseline JS</span> is a simple (μ+λ) strategy in vanilla JS for speed comparison.</div>
+          <div><span class="text-amber-200">Baseline JS</span> (headless) is only used in the race to report relative speed.</div>
           <div class="text-slate-400">Bounds/noise settings apply to the optimizer; visualization shows the 2D slice.</div>
           <div id="timing" class="text-slate-200 font-semibold"></div>
         </div>
@@ -966,7 +966,6 @@ function f(x) {
     }
 
     bind('run', 'click', run);
-    bind('run-js', 'click', () => runJsBaseline());
     bind('run-race', 'click', async () => {
       statusEl.textContent = 'Race: running WASM...';
       const benchKey = benchSelect.value;
