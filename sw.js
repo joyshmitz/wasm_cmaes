@@ -1,27 +1,28 @@
 // Service Worker for CMA-ES WebAssembly Playground
 // Provides offline support and caching for better performance
 
-const CACHE_NAME = 'cmaes-wasm-v1';
-const STATIC_CACHE_NAME = 'cmaes-static-v1';
-const DYNAMIC_CACHE_NAME = 'cmaes-dynamic-v1';
+const CACHE_NAME = 'cmaes-wasm-v2';
+const STATIC_CACHE_NAME = 'cmaes-static-v2';
+const DYNAMIC_CACHE_NAME = 'cmaes-dynamic-v2';
+const BASE = self.location.pathname.startsWith('/wasm_cmaes/') ? '/wasm_cmaes' : '';
 
 // Files to cache immediately on install
 const STATIC_ASSETS = [
-  '/wasm_cmaes/',
-  '/wasm_cmaes/index.html',
-  '/wasm_cmaes/examples/viz-benchmarks.html',
-  '/wasm_cmaes/examples/viz-benchmarks-classic.html',
-  '/wasm_cmaes/examples/tailwind.css',
-  '/wasm_cmaes/examples/app.js',
-  '/wasm_cmaes/favicon.ico',
-  '/wasm_cmaes/manifest.json',
-  '/wasm_cmaes/icon-192.png',
-  '/wasm_cmaes/icon-512.png',
+  `${BASE}/`,
+  `${BASE}/index.html`,
+  `${BASE}/examples/viz-benchmarks.html`,
+  `${BASE}/examples/viz-benchmarks-classic.html`,
+  `${BASE}/examples/tailwind.css`,
+  `${BASE}/examples/app.js`,
+  `${BASE}/favicon.ico`,
+  `${BASE}/manifest.json`,
+  `${BASE}/icon-192.png`,
+  `${BASE}/icon-512.png`,
   // WASM packages
-  '/wasm_cmaes/pkg/cmaes_wasm.js',
-  '/wasm_cmaes/pkg/cmaes_wasm_bg.wasm',
-  '/wasm_cmaes/pkg/cmaes_wasm_bg.wasm.d.ts',
-  '/wasm_cmaes/pkg/cmaes_wasm.d.ts'
+  `${BASE}/pkg/cmaes_wasm.js`,
+  `${BASE}/pkg/cmaes_wasm_bg.wasm`,
+  `${BASE}/pkg/cmaes_wasm_bg.wasm.d.ts`,
+  `${BASE}/pkg/cmaes_wasm.d.ts`
 ];
 
 // CDN resources to cache (network-first strategy)
@@ -128,7 +129,7 @@ async function cacheFirstStrategy(request) {
     console.error('[SW] Fetch failed:', error);
 
     // Return offline page if available
-    const offlineResponse = await caches.match('/wasm_cmaes/index.html');
+    const offlineResponse = await caches.match(`${BASE}/index.html`);
     if (offlineResponse) {
       return offlineResponse;
     }
