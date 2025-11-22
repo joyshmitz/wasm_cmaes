@@ -10,14 +10,6 @@ Live demo → https://dicklesworthstone.github.io/wasm_cmaes/examples/viz-benchm
 ## What this is
 Rust CMA-ES compiled to WebAssembly with a friendly JS/TS API, plus a visual playground (D3 + Tailwind + Three.js) and a vanilla-JS baseline for speed comparisons.
 
-## What’s new (2025-11)
-- **Covariance model toggle**: auto / full / separable / limited-memory, with HUD deltas across runs.
-- **Noise-aware mode**: robust sampling (adaptive, multi-sample) and noisy-run labeling.
-- **Constraint handling**: penalty (augmented), projection, and resample-with-cap strategies.
-- **Multi-run comparisons**: overlay prior runs, pin/compare, PCA scatter (dim>2), and parcoords for λ/σ/cond/best.
-- **Presets & sharing**: curated + recent presets; config URLs include bounds/noise/model/constraints.
-- **Onboarding**: quickstart carousel, learn-mode annotations, glossary of λ/σ/bounds/condition.
-
 ## Why CMA-ES (30-sec crash)
 - Samples λ candidates from a multivariate normal around a mean.
 - Ranks candidates, updates mean + covariance using weighted best μ.
@@ -74,7 +66,7 @@ const result = await runCmaes(new Float64Array([0,0]), 0.2, (x)=>x[0]*x[0]+x[1]*
 ```
 
 ## Visual demos
-- `examples/viz-benchmarks.html` — D3 + Tailwind + Three.js dashboard: log-loss plot + 3D surface (orbit controls), animated candidates/ellipse, timeline scrub/playback, PCA scatter (dim > 2), parcoords for run stats. Controls: λ, σ, seed, iters, bounds, noise (samples/adaptive + “noisy objective”), covariance model (auto/full/sep/lm), constraint strategy (penalty/project/resample with cap/weight), race mode (WASM vs JS), custom objective editor, presets & sharing. Benchmarks: Sphere, Rastrigin, Ackley, Griewank, Schwefel, Levy, Zakharov, Alpine N1, Bukin N.6, custom. Onboarding: quickstart carousel, learn-mode overlay badges, glossary, pinned/compare run HUD deltas, mobile sheet + mini HUD.
+- `examples/viz-benchmarks.html` — D3 + Tailwind + Three.js dashboard: log-loss plot + 3D surface (orbit controls), animated candidates/ellipse, timeline scrub/playback. Controls: λ, σ, seed, iters, dim, bounds/noise, race mode (WASM vs JS), custom objective editor. Benchmarks: Sphere, Rastrigin, Ackley, Griewank, Schwefel, Levy, Zakharov, Alpine N1, Bukin N.6, custom.
 - `examples/simple-sequential.html` — minimal sphere with `pkg/`.
 - `examples/simple-parallel.html` — Rosenbrock with `pkg-par/`.
 - Root `index.html` redirects to the viz.

@@ -8,6 +8,14 @@
   <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
   <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs/loader.js"></script>
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js",
+        "three/examples/": "https://cdn.jsdelivr.net/npm/three@0.165.0/examples/"
+      }
+    }
+  </script>
   <style>
     :root {
       color-scheme: dark;
@@ -268,8 +276,8 @@
 
   <script type="module">
     import init, { WasmCmaes } from "../pkg/cmaes_wasm.js";
-    import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js";
-    import { OrbitControls } from "https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/controls/OrbitControls.js";
+    import * as THREE from "three";
+    import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 
     // Load lucide icon paths (fallback-safe)
     let lucideIcons = {};
