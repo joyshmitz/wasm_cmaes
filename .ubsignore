@@ -1,0 +1,5 @@
+# Generated wasm-bindgen / build outputs
+pkg/**
+pkg-par/**
+target/**
+target-par/**

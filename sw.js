@@ -37,48 +37,46 @@ const CDN_RESOURCES = [
 self.addEventListener('install', (event) => {
   console.log('[SW] Installing service worker...');
 
-  event.waitUntil(
-    caches.open(STATIC_CACHE_NAME)
-      .then((cache) => {
-        console.log('[SW] Caching static assets');
-        return cache.addAll(STATIC_ASSETS);
-      })
-      .then(() => {
-        console.log('[SW] Static assets cached');
-        return self.skipWaiting(); // Activate immediately
-      })
-      .catch((err) => {
-        console.error('[SW] Failed to cache static assets:', err);
-      })
-  );
+  event.waitUntil((async () => {
+    try {
+      const cache = await caches.open(STATIC_CACHE_NAME);
+      console.log('[SW] Caching static assets');
+      await cache.addAll(STATIC_ASSETS);
+      console.log('[SW] Static assets cached');
+      await self.skipWaiting(); // Activate immediately
+    } catch (err) {
+      console.error('[SW] Failed to cache static assets:', err);
+    }
+  })());
 });
 
 // Activate event - clean up old caches
 self.addEventListener('activate', (event) => {
   console.log('[SW] Activating service worker...');
 
-  event.waitUntil(
-    caches.keys()
-      .then((cacheNames) => {
-        return Promise.all(
-          cacheNames
-            .filter((name) => {
-              // Remove old caches
-              return name !== STATIC_CACHE_NAME &&
-                     name !== DYNAMIC_CACHE_NAME &&
-                     name.startsWith('cmaes-');
-            })
-            .map((name) => {
-              console.log('[SW] Deleting old cache:', name);
-              return caches.delete(name);
-            })
-        );
-      })
-      .then(() => {
-        console.log('[SW] Service worker activated');
-        return self.clients.claim(); // Take control immediately
-      })
-  );
+  event.waitUntil((async () => {
+    try {
+      const cacheNames = await caches.keys();
+      await Promise.all(
+        cacheNames
+          .filter((name) => {
+            // Remove old caches
+            return name !== STATIC_CACHE_NAME &&
+                   name !== DYNAMIC_CACHE_NAME &&
+                   name.startsWith('cmaes-');
+          })
+          .map((name) => {
+            console.log('[SW] Deleting old cache:', name);
+            return caches.delete(name);
+          })
+      );
+
+      console.log('[SW] Service worker activated');
+      await self.clients.claim(); // Take control immediately
+    } catch (err) {
+      console.error('[SW] Activation failed:', err);
+    }
+  })());
 });
 
 // Fetch event - serve from cache when possible
@@ -174,7 +172,14 @@ async function networkFirstStrategy(request) {
       }
     }
 
-    throw error;
+    console.error('[SW] Network-first strategy fell back without cache:', error);
+    return new Response('Offline - please check your connection', {
+      status: 503,
+      statusText: 'Service Unavailable',
+      headers: new Headers({
+        'Content-Type': 'text/plain'
+      })
+    });
   }
 }
 
@@ -196,31 +201,43 @@ self.addEventListener('message', (event) => {
   }
 
   if (event.data && event.data.type === 'CLEAR_CACHE') {
-    event.waitUntil(
-      caches.keys().then((cacheNames) => {
-        return Promise.all(
-          cacheNames.map((name) => caches.delete(name))
-        );
-      }).then(() => {
-        event.ports[0].postMessage({ success: true });
-      })
-    );
+    event.waitUntil((async () => {
+      try {
+        const cacheNames = await caches.keys();
+        await Promise.all(cacheNames.map((name) => caches.delete(name)));
+        if (event.ports[0]) {
+          event.ports[0].postMessage({ success: true });
+        }
+      } catch (err) {
+        console.error('[SW] CLEAR_CACHE failed:', err);
+        if (event.ports[0]) {
+          event.ports[0].postMessage({ success: false, error: String(err) });
+        }
+      }
+    })());
   }
 
   if (event.data && event.data.type === 'CACHE_STATS') {
-    event.waitUntil(
-      caches.keys().then((cacheNames) => {
-        return Promise.all(
+    event.waitUntil((async () => {
+      try {
+        const cacheNames = await caches.keys();
+        const stats = await Promise.all(
           cacheNames.map(async (name) => {
             const cache = await caches.open(name);
             const keys = await cache.keys();
             return { name, count: keys.length };
           })
         );
-      }).then((stats) => {
-        event.ports[0].postMessage({ stats });
-      })
-    );
+        if (event.ports[0]) {
+          event.ports[0].postMessage({ stats });
+        }
+      } catch (err) {
+        console.error('[SW] CACHE_STATS failed:', err);
+        if (event.ports[0]) {
+          event.ports[0].postMessage({ error: String(err) });
+        }
+      }
+    })());
   }
 });
 

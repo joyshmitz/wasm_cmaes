@@ -937,11 +937,12 @@ impl CmaesFull {
             res.condition = true;
         }
         if self.fitvals.len() > 1 {
-            let last = *self.fitvals.last().unwrap();
-            let first = self.fitvals[0];
-            if (last - first).abs() < 1e-12 {
-                res.stopped = true;
-                res.tolfun = true;
+            if let Some(&last) = self.fitvals.last() {
+                let first = self.fitvals[0];
+                if (last - first).abs() < 1e-12 {
+                    res.stopped = true;
+                    res.tolfun = true;
+                }
             }
         }
         if !self.c.eigenvalues.is_empty() {
@@ -1179,11 +1180,12 @@ impl CmaesSep {
             res.condition = true;
         }
         if self.fitvals.len() > 1 {
-            let last = *self.fitvals.last().unwrap();
-            let first = self.fitvals[0];
-            if (last - first).abs() < 1e-12 {
-                res.stopped = true;
-                res.tolfun = true;
+            if let Some(&last) = self.fitvals.last() {
+                let first = self.fitvals[0];
+                if (last - first).abs() < 1e-12 {
+                    res.stopped = true;
+                    res.tolfun = true;
+                }
             }
         }
         let max_eig = self
@@ -1453,11 +1455,12 @@ impl CmaesLm {
             res.condition = true;
         }
         if self.fitvals.len() > 1 {
-            let last = *self.fitvals.last().unwrap();
-            let first = self.fitvals[0];
-            if (last - first).abs() < 1e-12 {
-                res.stopped = true;
-                res.tolfun = true;
+            if let Some(&last) = self.fitvals.last() {
+                let first = self.fitvals[0];
+                if (last - first).abs() < 1e-12 {
+                    res.stopped = true;
+                    res.tolfun = true;
+                }
             }
         }
         let max_eig = self
@@ -1580,7 +1583,7 @@ fn create_engine(
         CovarianceModelOpt::Full => Engine::Full(CmaesFull::new(xstart, sigma, opts)),
         CovarianceModelOpt::Sep => Engine::Sep(CmaesSep::new(xstart, sigma, opts)),
         CovarianceModelOpt::Lm => Engine::Lm(CmaesLm::new(xstart, sigma, opts)),
-        CovarianceModelOpt::Auto => unreachable!(),
+        CovarianceModelOpt::Auto => Engine::Full(CmaesFull::new(xstart, sigma, opts)),
     }
 }
 

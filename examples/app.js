@@ -21,10 +21,11 @@ function f(x) {
   return dx*dx + dy*dy + 0.1*Math.sin(3*dx) + 0.1*Math.cos(3*dy);
 }`;
     let editor;
+    const editorContainer = mustGet('editor');
     const monacoReady = new Promise((resolve) => {
       window.require.config({ paths: { vs: "https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs" } });
       window.require(["vs/editor/editor.main"], () => {
-        editor = monaco.editor.create(document.getElementById("editor"), {
+        editor = monaco.editor.create(editorContainer, {
           value: defaultCustomCode,
           language: "javascript",
           theme: "vs-dark",
@@ -140,11 +141,17 @@ function f(x) {
     };
 
     // Inject lucide icons
+    const parser = new DOMParser();
     document.querySelectorAll('.lucide').forEach((el) => {
       const name = el.dataset.icon;
       const path = lucideIcons[name];
       if (!path) return;
-      el.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${path.join('')}</svg>`;
+      const svgString = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${path.join('')}</svg>`;
+      const doc = parser.parseFromString(svgString, 'image/svg+xml');
+      const svgEl = doc.documentElement;
+      if (svgEl) {
+        el.replaceChildren(el.ownerDocument.importNode(svgEl, true));
+      }
     });
 
     const mustGet = (id) => {
@@ -165,6 +172,23 @@ function f(x) {
     const noiseAdaptive = mustGet('noise-adaptive');
     const timingEl = mustGet('timing');
     const raceResults = mustGet('race-results');
+    const lambdaInput = mustGet('lambda');
+    const sigmaInput = mustGet('sigma');
+    const itersInput = mustGet('iters');
+    const seedInput = mustGet('seed');
+    const helpOverlay = document.getElementById('help-overlay');
+    const helpCloseBtn = document.getElementById('help-close-btn');
+    const helpCloseX = document.getElementById('help-close-x');
+    const helpBtn = document.getElementById('help-btn');
+    const exportCsvBtn = mustGet('export-csv');
+    const exportJsonBtn = mustGet('export-json');
+    const shareBtn = mustGet('share-config');
+    const runBtn = mustGet('run');
+    const runJsBtn = mustGet('run-js');
+    const runRaceBtn = mustGet('run-race');
+    const applyCustomBtn = mustGet('apply-custom');
+    const toastContainer = mustGet('toast-container');
+    const bgCanvas = mustGet('bg-canvas');
 
     const lineSvg = d3.select('#line');
     const scrub = mustGet('scrub');
@@ -188,13 +212,13 @@ function f(x) {
 
     const linePath = lineG.append('path').attr('fill', 'none').attr('stroke', '#38bdf8').attr('stroke-width', 2.5);
 
-    const statusEl = document.getElementById('status');
-    const bestEl = document.getElementById('best-display');
-    const iterEl = document.getElementById('iter-display');
-    const hudFps = document.getElementById('hud-fps');
-    const hudWasm = document.getElementById('hud-wasm');
-    const hudJs = document.getElementById('hud-js');
-    const hudIter = document.getElementById('hud-iter');
+    const statusEl = mustGet('status');
+    const bestEl = mustGet('best-display');
+    const iterEl = mustGet('iter-display');
+    const hudFps = mustGet('hud-fps');
+    const hudWasm = mustGet('hud-wasm');
+    const hudJs = mustGet('hud-js');
+    const hudIter = mustGet('hud-iter');
 
     let wasmInitialized = false;
 
@@ -444,10 +468,10 @@ function f(x) {
 
       const benchKey = benchSelect.value;
       const bench = benchFns[benchKey];
-      const lambda = Number(document.getElementById('lambda').value) || 32;
-      const sigma = Number(document.getElementById('sigma').value) || 1.2;
-      const maxIter = Number(document.getElementById('iters').value) || 250;
-      const seed = Number(document.getElementById('seed').value) || 42;
+      const lambda = Number(lambdaInput.value) || 32;
+      const sigma = Number(sigmaInput.value) || 1.2;
+      const maxIter = Number(itersInput.value) || 250;
+      const seed = Number(seedInput.value) || 42;
       const dim = currentDim(benchKey);
       dimLabel.textContent = '2D surface view';
 
@@ -520,7 +544,7 @@ function f(x) {
         iter++;
         const now = performance.now();
         if (now - lastTs > 1000) {
-          document.getElementById('hud-iter').textContent = `${iterCounter} iter/s`;
+          hudIter.textContent = `${iterCounter} iter/s`;
           iterCounter = 0;
           lastTs = now;
         }
@@ -529,7 +553,7 @@ function f(x) {
           requestAnimationFrame(stepOnce);
         } else {
           statusEl.textContent = `Done in ${iter} iterations / ${res.evals} evals`;
-          document.getElementById('hud-wasm').textContent = `${res.evals} evals`;
+          hudWasm.textContent = `${res.evals} evals`;
         }
       };
 
@@ -539,10 +563,10 @@ function f(x) {
 
     function runJsBaseline(dimOverride) {
       const bench = benchFns[benchSelect.value];
-      const lambda = Number(document.getElementById('lambda').value) || 32;
-      const sigma0 = Number(document.getElementById('sigma').value) || 1.2;
-      const maxIter = Number(document.getElementById('iters').value) || 250;
-      const seed = Number(document.getElementById('seed').value) || 42;
+      const lambda = Number(lambdaInput.value) || 32;
+      const sigma0 = Number(sigmaInput.value) || 1.2;
+      const maxIter = Number(itersInput.value) || 250;
+      const seed = Number(seedInput.value) || 42;
       const dim = dimOverride || 2;
 
       const rng = (() => {
@@ -632,18 +656,18 @@ function f(x) {
       iterEl.textContent = `Iter ${hist[hist.length - 1].iter}`;
     }
 
-    document.getElementById('run').addEventListener('click', run);
-    document.getElementById('run-js').addEventListener('click', () => runJsBaseline());
-    const runMobileBtn = document.getElementById('run-mobile');
+    runBtn.addEventListener('click', run);
+    runJsBtn.addEventListener('click', () => runJsBaseline());
+    const runMobileBtn = mustGet('run-mobile');
     if (runMobileBtn) runMobileBtn.addEventListener('click', run);
-    document.getElementById('run-race').addEventListener('click', async () => {
+    runRaceBtn.addEventListener('click', async () => {
       statusEl.textContent = 'Race: running WASM...';
       const benchKey = benchSelect.value;
       const bench = benchFns[benchKey];
-      const lambda = Number(document.getElementById('lambda').value) || 32;
-      const sigma = Number(document.getElementById('sigma').value) || 1.2;
-      const maxIter = Number(document.getElementById('iters').value) || 250;
-      const seed = Number(document.getElementById('seed').value) || 42;
+      const lambda = Number(lambdaInput.value) || 32;
+      const sigma = Number(sigmaInput.value) || 1.2;
+      const maxIter = Number(itersInput.value) || 250;
+      const seed = Number(seedInput.value) || 42;
       const dim = currentDim(benchKey);
       const opts = buildOptions(lambda, maxIter, seed, dim);
       if (!wasmInitialized) { await init(); wasmInitialized = true; }
@@ -667,9 +691,15 @@ function f(x) {
 
       statusEl.textContent = 'Race: running JS baseline...';
       const jsRes = runJsBaseline(dim);
-      raceResults.innerHTML = `<div class="font-semibold">Race results</div>
-        <div>WASM: f=${wasmRes.best_f.toExponential(3)}, ${wasmMs.toFixed(1)} ms</div>
-        <div>JS: f=${jsRes.bestF.toExponential(3)}, ${jsRes.ms.toFixed(1)} ms</div>`;
+      raceResults.replaceChildren();
+      const title = document.createElement('div');
+      title.className = 'font-semibold';
+      title.textContent = 'Race results';
+      const wasmLine = document.createElement('div');
+      wasmLine.textContent = `WASM: f=${wasmRes.best_f.toExponential(3)}, ${wasmMs.toFixed(1)} ms`;
+      const jsLine = document.createElement('div');
+      jsLine.textContent = `JS: f=${jsRes.bestF.toExponential(3)}, ${jsRes.ms.toFixed(1)} ms`;
+      raceResults.append(title, wasmLine, jsLine);
       statusEl.textContent = 'Race complete';
     });
 
@@ -708,7 +738,7 @@ function f(x) {
       if (playbackState.playing) requestAnimationFrame(playLoop);
     });
 
-    document.getElementById('apply-custom').addEventListener('click', async () => {
+    applyCustomBtn.addEventListener('click', async () => {
       await monacoReady;
       try {
         const code = editor.getValue();
@@ -732,14 +762,14 @@ function f(x) {
       'Restarts: optional IPOP/BIPOP strategies to escape local minima.'
     ];
     let tutorialIdx = 0;
-    const tutorialOverlay = document.getElementById('tutorial-overlay');
-    const tutorialContent = document.getElementById('tutorial-content');
-    const tutorialStepCount = document.getElementById('tutorial-step-count');
-    const tutorialPrev = document.getElementById('tutorial-prev');
-    const tutorialNext = document.getElementById('tutorial-next');
-    const tutorialClose = document.getElementById('tutorial-close');
-    const tutorialSkip = document.getElementById('tutorial-skip');
-    const startTutorialBtn = document.getElementById('start-tutorial');
+    const tutorialOverlay = mustGet('tutorial-overlay');
+    const tutorialContent = mustGet('tutorial-content');
+    const tutorialStepCount = mustGet('tutorial-step-count');
+    const tutorialPrev = mustGet('tutorial-prev');
+    const tutorialNext = mustGet('tutorial-next');
+    const tutorialClose = mustGet('tutorial-close');
+    const tutorialSkip = mustGet('tutorial-skip');
+    const startTutorialBtn = mustGet('start-tutorial');
 
     const renderTutorial = () => {
       if (!tutorialContent || !tutorialStepCount) return;
@@ -769,11 +799,11 @@ function f(x) {
     if (startTutorialBtn) startTutorialBtn.addEventListener('click', openTutorial);
 
     // Mobile bottom sheet controls + sync with desktop controls
-    const sheet = document.getElementById('mobile-sheet');
+    const sheet = mustGet('mobile-sheet');
     const handleBar = sheet?.querySelector('.handle-bar');
-    const closeSheet = document.getElementById('close-sheet');
-    const toggleAdvanced = document.getElementById('toggle-advanced');
-    const advancedOptions = document.getElementById('advanced-options');
+    const closeSheet = mustGet('close-sheet');
+    const toggleAdvanced = mustGet('toggle-advanced');
+    const advancedOptions = mustGet('advanced-options');
 
     const openSheet = () => sheet?.classList.add('open');
     const closeSheetFn = () => sheet?.classList.remove('open');
@@ -797,9 +827,8 @@ function f(x) {
       ['seed', 'seed-mobile'],
     ];
     syncPairs.forEach(([desktopId, mobileId]) => {
-      const d = document.getElementById(desktopId);
-      const m = document.getElementById(mobileId);
-      if (!d || !m) return;
+      const d = mustGet(desktopId);
+      const m = mustGet(mobileId);
       const copy = (src, dst) => dst && (dst.value = src.value);
       d.addEventListener('input', () => copy(d, m));
       m.addEventListener('input', () => copy(m, d));
@@ -808,7 +837,7 @@ function f(x) {
     });
 
     // Mobile run button uses the same run pipeline then closes the sheet
-    const runMobileBtn = document.getElementById('run-mobile');
+    const runMobileBtn = mustGet('run-mobile');
     if (runMobileBtn) runMobileBtn.addEventListener('click', () => {
       run();
       closeSheetFn();
@@ -830,7 +859,7 @@ function f(x) {
     tick();
 
     // Background Three.js particles
-    const canvas = document.getElementById('bg-canvas');
+    const canvas = bgCanvas;
     const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1, 1000);
@@ -914,7 +943,7 @@ function f(x) {
 
     // Toast notification system
     function showToast(message, type = 'info', duration = 3000) {
-      const container = document.getElementById('toast-container');
+      const container = toastContainer;
       if (!container) return;
 
       const toast = document.createElement('div');
@@ -934,7 +963,12 @@ function f(x) {
         warning: '⚠️',
         error: '✗'
       };
-      toast.innerHTML = `<span class="mr-2">${icons[type] || icons.info}</span>${message}`;
+      const iconSpan = document.createElement('span');
+      iconSpan.className = 'mr-2';
+      iconSpan.textContent = icons[type] || icons.info;
+      const messageSpan = document.createElement('span');
+      messageSpan.textContent = message;
+      toast.replaceChildren(iconSpan, messageSpan);
 
       container.appendChild(toast);
 
@@ -957,7 +991,7 @@ function f(x) {
 
       const headers = 'iteration,best_value,lambda\n';
       const rows = optimizationHistory.map((h, i) => {
-        return `${i + 1},${h.best},${document.getElementById('lambda').value}`;
+        return `${i + 1},${h.best},${lambdaInput.value}`;
       }).join('\n');
 
       const csv = headers + rows;
@@ -984,10 +1018,10 @@ function f(x) {
       const data = {
         benchmark: currentRunMetadata?.benchmark || benchSelect.value,
         parameters: currentRunMetadata || {
-          lambda: Number(document.getElementById('lambda').value),
-          sigma: Number(document.getElementById('sigma').value),
-          maxIterations: Number(document.getElementById('iters').value),
-          seed: Number(document.getElementById('seed').value),
+          lambda: Number(lambdaInput.value),
+          sigma: Number(sigmaInput.value),
+          maxIterations: Number(itersInput.value),
+          seed: Number(seedInput.value),
           dimensions: currentDim(benchSelect.value)
         },
         history: optimizationHistory,
@@ -1013,10 +1047,10 @@ function f(x) {
     function shareConfig() {
       const params = new URLSearchParams({
         bench: benchSelect.value,
-        lambda: document.getElementById('lambda').value,
-        sigma: document.getElementById('sigma').value,
-        iters: document.getElementById('iters').value,
-        seed: document.getElementById('seed').value
+        lambda: lambdaInput.value,
+        sigma: sigmaInput.value,
+        iters: itersInput.value,
+        seed: seedInput.value
       });
 
       const url = `${window.location.origin}${window.location.pathname}?${params.toString()}`;
@@ -1051,10 +1085,10 @@ function f(x) {
       const params = new URLSearchParams(window.location.search);
 
       if (params.has('bench')) benchSelect.value = params.get('bench');
-      if (params.has('lambda')) document.getElementById('lambda').value = params.get('lambda');
-      if (params.has('sigma')) document.getElementById('sigma').value = params.get('sigma');
-      if (params.has('iters')) document.getElementById('iters').value = params.get('iters');
-      if (params.has('seed')) document.getElementById('seed').value = params.get('seed');
+      if (params.has('lambda')) lambdaInput.value = params.get('lambda');
+      if (params.has('sigma')) sigmaInput.value = params.get('sigma');
+      if (params.has('iters')) itersInput.value = params.get('iters');
+      if (params.has('seed')) seedInput.value = params.get('seed');
 
       if (params.size > 0) {
         showToast('Configuration loaded from URL', 'info');
@@ -1067,7 +1101,6 @@ function f(x) {
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
 
       // Don't trigger shortcuts when typing in Monaco editor
-      const editorContainer = document.getElementById('editor');
       if (editorContainer && editorContainer.contains(e.target)) return;
 
       // Space: Run optimization
@@ -1080,10 +1113,10 @@ function f(x) {
       if (e.key === 'r' || e.key === 'R') {
         e.preventDefault();
         benchSelect.value = 'sphere';
-        document.getElementById('lambda').value = '32';
-        document.getElementById('sigma').value = '1.2';
-        document.getElementById('iters').value = '250';
-        document.getElementById('seed').value = '42';
+        lambdaInput.value = '32';
+        sigmaInput.value = '1.2';
+        itersInput.value = '250';
+        seedInput.value = '42';
         showToast('Reset to default values', 'info');
       }
 
@@ -1112,11 +1145,8 @@ function f(x) {
       }
 
       // Escape: Close help overlay
-      if (e.key === 'Escape') {
-        const helpOverlay = document.getElementById('help-overlay');
-        if (helpOverlay && !helpOverlay.classList.contains('hidden')) {
-          toggleHelp();
-        }
+      if (e.key === 'Escape' && helpOverlay && !helpOverlay.classList.contains('hidden')) {
+        toggleHelp();
       }
     });
 
@@ -1124,28 +1154,25 @@ function f(x) {
     let helpTriggerElement = null;
 
     function toggleHelp() {
-      const overlay = document.getElementById('help-overlay');
-      if (!overlay) return;
-
-      const isHidden = overlay.classList.contains('hidden');
+      if (!helpOverlay) return;
+      const isHidden = helpOverlay.classList.contains('hidden');
 
       if (isHidden) {
         // Opening - store current focus and move to overlay
         helpTriggerElement = document.activeElement;
-        overlay.classList.remove('hidden');
+        helpOverlay.classList.remove('hidden');
 
         // Focus the close button for keyboard accessibility
         setTimeout(() => {
-          const closeBtn = document.getElementById('help-close-btn');
-          if (closeBtn) closeBtn.focus();
+          if (helpCloseBtn) helpCloseBtn.focus();
         }, 50);
 
         // Add focus trap
-        overlay.addEventListener('keydown', trapFocus);
+        helpOverlay.addEventListener('keydown', trapFocus);
       } else {
         // Closing - return focus to trigger
-        overlay.classList.add('hidden');
-        overlay.removeEventListener('keydown', trapFocus);
+        helpOverlay.classList.add('hidden');
+        helpOverlay.removeEventListener('keydown', trapFocus);
 
         if (helpTriggerElement && typeof helpTriggerElement.focus === 'function') {
           helpTriggerElement.focus();
@@ -1158,8 +1185,8 @@ function f(x) {
     function trapFocus(e) {
       if (e.key !== 'Tab') return;
 
-      const overlay = document.getElementById('help-overlay');
-      const focusableElements = overlay.querySelectorAll(
+      if (!helpOverlay) return;
+      const focusableElements = helpOverlay.querySelectorAll(
         'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
       );
       const firstElement = focusableElements[0];
@@ -1184,16 +1211,9 @@ function f(x) {
     loadConfigFromURL();
 
     // Add event listeners to export buttons if they exist
-    const exportCsvBtn = document.getElementById('export-csv');
-    const exportJsonBtn = document.getElementById('export-json');
-    const shareBtn = document.getElementById('share-config');
-    const helpBtn = document.getElementById('help-btn');
-    const helpCloseX = document.getElementById('help-close-x');
-    const helpCloseBtn = document.getElementById('help-close-btn');
-
-    if (exportCsvBtn) exportCsvBtn.addEventListener('click', exportCSV);
-    if (exportJsonBtn) exportJsonBtn.addEventListener('click', exportJSON);
-    if (shareBtn) shareBtn.addEventListener('click', shareConfig);
+    exportCsvBtn.addEventListener('click', exportCSV);
+    exportJsonBtn.addEventListener('click', exportJSON);
+    shareBtn.addEventListener('click', shareConfig);
     if (helpBtn) helpBtn.addEventListener('click', toggleHelp);
     if (helpCloseX) helpCloseX.addEventListener('click', toggleHelp);
     if (helpCloseBtn) helpCloseBtn.addEventListener('click', toggleHelp);

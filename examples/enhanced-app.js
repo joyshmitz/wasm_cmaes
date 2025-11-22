@@ -63,15 +63,32 @@ const showToast = (message, type = 'info', duration = 3000) => {
     info: 'ℹ'
   }[type] || 'ℹ';
 
-  toast.innerHTML = `
-    <div class="text-lg">${icon}</div>
-    <div class="flex-1 text-sm">${message}</div>
-    <button class="text-slate-400 hover:text-slate-200" onclick="this.parentElement.remove()">
-      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-      </svg>
-    </button>
-  `;
+  const iconEl = document.createElement('div');
+  iconEl.className = 'text-lg';
+  iconEl.textContent = icon;
+
+  const msgEl = document.createElement('div');
+  msgEl.className = 'flex-1 text-sm';
+  msgEl.textContent = message;
+
+  const closeBtn = document.createElement('button');
+  closeBtn.className = 'text-slate-400 hover:text-slate-200';
+  closeBtn.setAttribute('aria-label', 'Close toast');
+  const closeSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  closeSvg.setAttribute('class', 'w-4 h-4');
+  closeSvg.setAttribute('fill', 'none');
+  closeSvg.setAttribute('stroke', 'currentColor');
+  closeSvg.setAttribute('viewBox', '0 0 24 24');
+  const closePath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  closePath.setAttribute('stroke-linecap', 'round');
+  closePath.setAttribute('stroke-linejoin', 'round');
+  closePath.setAttribute('stroke-width', '2');
+  closePath.setAttribute('d', 'M6 18L18 6M6 6l12 12');
+  closeSvg.appendChild(closePath);
+  closeBtn.appendChild(closeSvg);
+  closeBtn.addEventListener('click', () => toast.remove());
+
+  toast.replaceChildren(iconEl, msgEl, closeBtn);
 
   container.appendChild(toast);
   announceToScreenReader(message);
@@ -135,8 +152,11 @@ const updateURL = (config) => {
 
 const toggleTheme = () => {
   state.isDark = !state.isDark;
-  document.documentElement.classList.toggle('light', !state.isDark);
-  document.documentElement.classList.toggle('dark', state.isDark);
+  const root = document.documentElement;
+  if (root) {
+    root.classList.toggle('light', !state.isDark);
+    root.classList.toggle('dark', state.isDark);
+  }
 
   const moonIcon = mustGet('moon-icon');
   const sunIcon = mustGet('sun-icon');
@@ -408,28 +428,44 @@ const renderCommands = (filter = '') => {
     cmd.title.toLowerCase().includes(filter.toLowerCase())
   );
 
-  list.innerHTML = filtered.map((cmd, idx) => `
-    <div class="command-item ${idx === 0 ? 'selected' : ''}" data-command-id="${cmd.id}">
-      <div class="flex items-center justify-between">
-        <div class="flex items-center gap-3">
-          <span class="text-lg">${cmd.icon}</span>
-          <span class="text-sm text-slate-200">${cmd.title}</span>
-        </div>
-        ${cmd.hotkey ? `<kbd class="text-xs text-slate-400 bg-slate-800 px-2 py-1 rounded">${cmd.hotkey}</kbd>` : ''}
-      </div>
-    </div>
-  `).join('');
+  list.replaceChildren();
+  filtered.forEach((cmd, idx) => {
+    const item = document.createElement('div');
+    item.className = `command-item ${idx === 0 ? 'selected' : ''}`;
+    item.dataset.commandId = cmd.id;
 
-  // Add click handlers
-  list.querySelectorAll('.command-item').forEach(item => {
+    const row = document.createElement('div');
+    row.className = 'flex items-center justify-between';
+
+    const left = document.createElement('div');
+    left.className = 'flex items-center gap-3';
+    const iconSpan = document.createElement('span');
+    iconSpan.className = 'text-lg';
+    iconSpan.textContent = cmd.icon;
+    const titleSpan = document.createElement('span');
+    titleSpan.className = 'text-sm text-slate-200';
+    titleSpan.textContent = cmd.title;
+    left.append(iconSpan, titleSpan);
+
+    row.appendChild(left);
+
+    if (cmd.hotkey) {
+      const kbd = document.createElement('kbd');
+      kbd.className = 'text-xs text-slate-400 bg-slate-800 px-2 py-1 rounded';
+      kbd.textContent = cmd.hotkey;
+      row.appendChild(kbd);
+    }
+
+    item.appendChild(row);
     item.addEventListener('click', () => {
-      const cmdId = item.dataset.commandId;
-      const cmd = commands.find(c => c.id === cmdId);
-      if (cmd) {
-        cmd.handler();
+      const found = commands.find(c => c.id === cmd.id);
+      if (found) {
+        found.handler();
         toggleCommandPalette();
       }
     });
+
+    list.appendChild(item);
   });
 };
 
@@ -709,7 +745,16 @@ const renderTutorialStep = () => {
   const nextBtn = mustGet('tutorial-next');
 
   if (content) {
-    content.innerHTML = `<h4 class="text-lg font-semibold mb-2">${step.title}</h4>${step.content}`;
+    const parser = new DOMParser();
+    const fragmentDoc = parser.parseFromString(
+      `<div><h4 class="text-lg font-semibold mb-2">${step.title}</h4>${step.content}</div>`,
+      'text/html'
+    );
+    const wrapper = fragmentDoc.body.firstElementChild;
+    if (wrapper) {
+      const nodes = Array.from(wrapper.childNodes).map((n) => content.ownerDocument.importNode(n, true));
+      content.replaceChildren(...nodes);
+    }
   }
 
   if (stepCount) {
@@ -899,7 +944,11 @@ export const initEnhancedApp = () => {
 
     if (saved.theme) {
       state.isDark = saved.theme === 'dark';
-      document.documentElement.classList.toggle('light', !state.isDark);
+      const root = document.documentElement;
+      if (root) {
+        root.classList.toggle('light', !state.isDark);
+        root.classList.toggle('dark', state.isDark);
+      }
     }
   }
 
