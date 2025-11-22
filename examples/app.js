@@ -1197,3 +1197,10 @@ function f(x) {
     if (helpBtn) helpBtn.addEventListener('click', toggleHelp);
     if (helpCloseX) helpCloseX.addEventListener('click', toggleHelp);
     if (helpCloseBtn) helpCloseBtn.addEventListener('click', toggleHelp);
+
+    // Register service worker for PWA/offline support (best-effort)
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/wasm_cmaes/sw.js').catch((err) => {
+        console.warn('Service worker registration failed', err);
+      });
+    }
