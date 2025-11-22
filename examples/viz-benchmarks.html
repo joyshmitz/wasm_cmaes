@@ -1,1261 +1,670 @@
 <!doctype html>
-<html lang="en" class="dark">
+<html lang="en" class="dark antialiased">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, user-scalable=yes">
-  <meta name="theme-color" content="#0c162a">
-  <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="description" content="Interactive CMA-ES optimization playground with WebAssembly. Visualize benchmark functions in real-time with 3D surfaces and convergence plots.">
-
-  <title>CMA-ES Benchmark Gallery - Interactive WebAssembly Optimizer</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#0f172a">
+  <meta name="description" content="High-performance WebAssembly optimization benchmark.">
+  <title>WASM CMA-ES · Studio</title>
+  
+  <!-- Favicon -->
   <link rel="icon" href="/wasm_cmaes/favicon.ico" />
-  <link rel="manifest" href="/wasm_cmaes/manifest.json" />
 
-  <!-- Fonts -->
+  <!-- Fonts: Inter & JetBrains Mono -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 
-  <!-- Core Libraries -->
+  <!-- Tailwind -->
   <link rel="stylesheet" href="./tailwind.css" />
+  
+  <!-- Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <!-- Libraries -->
+  <script type="importmap">
+    { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js" } }
+  </script>
   <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
   <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs/loader.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js"></script>
+  <script src="https://unpkg.com/tippy.js@6"></script>
+  <script src="https://cdn.jsdelivr.net/npm/cupertino-pane@1.3.6/dist/cupertino-pane.min.js"></script>
 
   <style>
     :root {
-      color-scheme: dark;
-      /* Semantic Color Tokens */
-      --color-primary: #38bdf8;
-      --color-secondary: #a78bfa;
-      --color-success: #10b981;
-      --color-warning: #f59e0b;
-      --color-danger: #ef4444;
-      --color-accent: #ec4899;
-
-      /* Gradients */
-      --gradient-primary: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      --gradient-surface: linear-gradient(135deg, #38bdf8 0%, #6366f1 100%);
-      --gradient-glow: radial-gradient(circle, rgba(56,189,248,0.15), transparent);
-
-      /* Spacing */
-      --touch-target: 48px;
-    }
-
-    * {
-      box-sizing: border-box;
+      /* Base Palette: Deep, rich Slate */
+      --bg-app: #020617; /* Slate 950 */
+      --bg-sidebar: #0f172a; /* Slate 900 */
+      --border-subtle: rgba(255, 255, 255, 0.08);
+      
+      /* Accent: Indigo -> Violet */
+      --accent-primary: #6366f1;
+      --accent-glow: rgba(99, 102, 241, 0.2);
+      
+      /* Text */
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      
+      /* Animation */
+      --ease-spring: cubic-bezier(0.175, 0.885, 0.32, 1.1);
     }
 
     body {
-      font-family: 'Inter', system-ui, -apple-system, sans-serif;
-      min-height: 100vh;
-      color: #e2e8f0;
-      background: radial-gradient(circle at 20% 20%, #122341, #0c162a 40%, #070d1a 70%, #050912);
-      position: relative;
-      overflow-x: hidden;
-      font-size: clamp(0.875rem, 2vw, 1rem);
-    }
-
-    h1 { font-size: clamp(1.75rem, 5vw, 2.5rem); font-weight: 600; }
-    h2 { font-size: clamp(1.25rem, 3vw, 1.75rem); font-weight: 600; }
-    h3 { font-size: clamp(1.125rem, 2.5vw, 1.5rem); font-weight: 600; }
-
-    code, pre, .font-mono {
-      font-family: 'JetBrains Mono', 'Courier New', monospace;
-    }
-
-    /* Screen reader only */
-    .sr-only {
-      position: absolute;
-      width: 1px;
-      height: 1px;
-      padding: 0;
-      margin: -1px;
+      background-color: var(--bg-app);
+      color: var(--text-main);
+      font-family: 'Inter', system-ui, sans-serif;
+      -webkit-font-smoothing: antialiased;
       overflow: hidden;
-      clip: rect(0, 0, 0, 0);
-      white-space: nowrap;
-      border-width: 0;
     }
 
-    .sr-only:focus {
-      position: static;
-      width: auto;
-      height: auto;
-      padding: inherit;
-      margin: inherit;
-      overflow: visible;
-      clip: auto;
-      white-space: normal;
+    /* Typography Polish */
+    h1, h2, h3, .font-heading { letter-spacing: -0.025em; }
+    .font-mono { font-family: 'JetBrains Mono', monospace; letter-spacing: -0.02em; }
+    
+    /* Glassmorphism - Refined */
+    .glass {
+      background: rgba(15, 23, 42, 0.65);
+      backdrop-filter: blur(24px) saturate(180%);
+      -webkit-backdrop-filter: blur(24px) saturate(180%);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
     }
-
-    /* Focus visible styles */
-    *:focus-visible {
-      outline: 2px solid var(--color-primary);
-      outline-offset: 2px;
-      border-radius: 0.25rem;
+    
+    /* Inputs - "Stripe-like" */
+    .stripe-input {
+      background: rgba(2, 6, 23, 0.5);
+      border: 1px solid rgba(255,255,255,0.1);
+      color: #f1f5f9;
+      border-radius: 6px;
+      padding: 8px 12px;
+      font-size: 13px;
+      width: 100%;
+      transition: all 0.2s ease;
+      outline: none;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.1) inset;
     }
-
-    /* Animated background */
-    body::before {
-      content: "";
-      position: fixed;
-      inset: 0;
-      background: linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px),
-                  linear-gradient(0deg, rgba(255,255,255,0.02) 1px, transparent 1px);
-      background-size: 80px 80px;
-      mask-image: radial-gradient(circle at 50% 40%, rgba(255,255,255,0.4), transparent 65%);
-      z-index: 0;
-      animation: drift 30s linear infinite;
+    .stripe-input:focus {
+      background: rgba(2, 6, 23, 0.8);
+      border-color: var(--accent-primary);
+      box-shadow: 0 0 0 3px var(--accent-glow), 0 1px 2px rgba(0,0,0,0.1) inset;
     }
-
-    body::after {
-      content: "";
-      position: fixed;
-      inset: 0;
-      background: radial-gradient(circle at 70% 20%, rgba(56,189,248,0.18), transparent 45%),
-                  radial-gradient(circle at 25% 70%, rgba(99,102,241,0.14), transparent 50%);
-      z-index: 0;
-      pointer-events: none;
-    }
-
-    @keyframes drift {
-      from { transform: translate3d(0,0,0); }
-      to   { transform: translate3d(80px,80px,0); }
-    }
-
-    /* Enhanced glassmorphism */
-    .panel {
-      position: relative;
-      backdrop-filter: blur(20px) saturate(180%);
-      -webkit-backdrop-filter: blur(20px) saturate(180%);
-      background: linear-gradient(135deg, rgba(255,255,255,0.1), rgba(255,255,255,0.05));
-      border: 1px solid rgba(255,255,255,0.12);
-      box-shadow:
-        0 8px 32px 0 rgba(0, 0, 0, 0.37),
-        inset 0 1px 1px rgba(255, 255, 255, 0.1);
-      z-index: 1;
-    }
-
-    .panel-glass {
-      backdrop-filter: blur(20px) saturate(180%);
-      -webkit-backdrop-filter: blur(20px) saturate(180%);
-      background: linear-gradient(135deg, rgba(255,255,255,0.1), rgba(255,255,255,0.05));
-      border: 1px solid rgba(255,255,255,0.12);
-    }
-
-    /* Button micro-interactions */
-    button, .btn {
-      min-height: var(--touch-target);
-      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-    }
-
-    button:hover, .btn:hover {
-      transform: scale(1.02);
-    }
-
-    button:active, .btn:active {
-      transform: scale(0.98);
-    }
-
-    /* Toast notification */
-    .toast {
-      position: fixed;
-      bottom: 1rem;
-      right: 1rem;
-      z-index: 9999;
-      animation: slideInRight 0.3s ease-out;
-      max-width: 90vw;
-    }
-
-    @keyframes slideInRight {
-      from {
-        transform: translateX(100%);
-        opacity: 0;
-      }
-      to {
-        transform: translateX(0);
-        opacity: 1;
-      }
-    }
-
-    @keyframes slideOutRight {
-      from {
-        transform: translateX(0);
-        opacity: 1;
-      }
-      to {
-        transform: translateX(100%);
-        opacity: 0;
-      }
-    }
-
-    /* Progress bar */
-    .progress-bar {
-      height: 4px;
-      background: rgba(56, 189, 248, 0.2);
-      overflow: hidden;
-      border-radius: 9999px;
-    }
-
-    .progress-bar-fill {
-      height: 100%;
-      background: linear-gradient(90deg, var(--color-primary), var(--color-secondary));
-      transition: width 0.3s ease;
-      border-radius: 9999px;
-    }
-
-    /* Tooltip */
-    .tooltip {
-      position: absolute;
-      background: rgba(0, 0, 0, 0.9);
-      color: white;
-      padding: 0.5rem 0.75rem;
-      border-radius: 0.375rem;
-      font-size: 0.875rem;
-      white-space: nowrap;
-      z-index: 9998;
-      pointer-events: none;
-      opacity: 0;
-      transition: opacity 0.2s;
-    }
-
-    .tooltip.show {
-      opacity: 1;
-    }
-
-    /* Chart enhancements */
-    .chart text { fill: #cbd5e1; font-size: 12px; }
-    .chart .axis line, .chart .axis path { stroke: #64748b; }
-    .chart .grid line { stroke: rgba(255,255,255,0.05); }
-
-    /* Loading skeleton */
-    .skeleton {
-      background: linear-gradient(90deg, #1e293b 25%, #334155 50%, #1e293b 75%);
-      background-size: 200% 100%;
-      animation: loading 1.5s ease-in-out infinite;
-    }
-
-    @keyframes loading {
-      0% { background-position: 200% 0; }
-      100% { background-position: -200% 0; }
-    }
-
-    /* Mobile bottom sheet */
-    .bottom-sheet {
-      position: fixed;
-      inset: 0;
-      top: auto;
-      transform: translateY(calc(100% - 60px));
-      transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-      touch-action: pan-y;
-      z-index: 50;
-    }
-
-    .bottom-sheet.open {
-      transform: translateY(0);
-    }
-
-    .handle-bar {
-      width: 3rem;
-      height: 4px;
-      background: #64748b;
-      border-radius: 9999px;
-      margin: 0.75rem auto;
-      cursor: grab;
-    }
-
-    .handle-bar:active {
-      cursor: grabbing;
-    }
-
-    /* Command palette */
-    .command-palette {
-      position: fixed;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%) scale(0.95);
-      width: 90%;
-      max-width: 600px;
-      max-height: 70vh;
-      opacity: 0;
-      pointer-events: none;
-      z-index: 9997;
-      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-    }
-
-    .command-palette.active {
-      opacity: 1;
-      transform: translate(-50%, -50%) scale(1);
-      pointer-events: auto;
-    }
-
-    .command-item {
-      padding: 0.75rem 1rem;
+    
+    /* Range Slider - Custom */
+    .stripe-range {
+      -webkit-appearance: none;
+      width: 100%;
+      background: transparent;
+      height: 20px;
       cursor: pointer;
-      border-bottom: 1px solid rgba(255,255,255,0.05);
-      transition: background 0.15s;
     }
-
-    .command-item:hover, .command-item.selected {
-      background: rgba(56, 189, 248, 0.1);
-    }
-
-    /* Benchmark card */
-    .benchmark-card {
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-
-    .benchmark-card:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 8px 24px rgba(56, 189, 248, 0.2);
-    }
-
-    .benchmark-card .expanded-content {
-      max-height: 0;
-      overflow: hidden;
-      transition: max-height 0.3s ease;
-    }
-
-    .benchmark-card.expanded .expanded-content {
-      max-height: 500px;
-    }
-
-    /* Reduced motion support */
-    @media (prefers-reduced-motion: reduce) {
-      *,
-      *::before,
-      *::after {
-        animation-duration: 0.01ms !important;
-        animation-iteration-count: 1 !important;
-        transition-duration: 0.01ms !important;
-      }
-
-      .panel {
-        animation: none !important;
-      }
-    }
-
-    /* High contrast mode */
-    @media (prefers-contrast: high) {
-      .panel {
-        border: 2px solid white;
-        background: #000;
-      }
-
-      button {
-        border: 2px solid currentColor;
-      }
-    }
-
-    /* Mobile-specific */
-    @media (max-width: 768px) {
-      .mobile-hide {
-        display: none !important;
-      }
-
-      h1 {
-        font-size: 1.75rem;
-      }
-
-      .panel {
-        padding: 1rem !important;
-      }
-    }
-
-    /* Light mode (toggle) */
-    html.light body {
-      background: radial-gradient(circle at 20% 20%, #e0f2fe, #f8fafc 40%, #ffffff 70%, #f1f5f9);
-      color: #0f172a;
-    }
-
-    html.light .panel {
-      background: linear-gradient(135deg, rgba(255,255,255,0.9), rgba(255,255,255,0.7));
-      border: 1px solid rgba(0,0,0,0.08);
-      box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.08);
-    }
-
-    html.light .chart text { fill: #334155; }
-    html.light .chart .axis line, html.light .chart .axis path { stroke: #94a3b8; }
-
-    /* Particle trail */
-    .particle-trail {
-      position: absolute;
-      width: 4px;
+    .stripe-range::-webkit-slider-runnable-track {
+      width: 100%;
       height: 4px;
-      background: var(--color-warning);
+      background: #334155;
+      border-radius: 99px;
+    }
+    .stripe-range::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      height: 16px;
+      width: 16px;
       border-radius: 50%;
-      pointer-events: none;
-      animation: fadeTrail 1s ease-out forwards;
+      background: white;
+      border: 2px solid var(--accent-primary);
+      margin-top: -6px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+      transition: transform 0.1s var(--ease-spring);
     }
+    .stripe-range:active::-webkit-slider-thumb { transform: scale(1.2); }
 
-    @keyframes fadeTrail {
-      to {
-        opacity: 0;
-        transform: scale(2);
-      }
+    /* Scrollbars */
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+    /* Cupertino Pane Overrides */
+    .cupertino-pane-wrapper .pane {
+        background: #0f172a !important;
+        border-top: 1px solid rgba(255,255,255,0.1);
+        box-shadow: 0 -20px 60px rgba(0,0,0,0.6);
     }
-</style>
+    .cupertino-pane-wrapper .draggable {
+        background: #475569 !important;
+        opacity: 0.5;
+    }
+  </style>
 </head>
-<body class="min-h-screen" role="document">
-  <!-- Skip link for accessibility -->
-  <a href="#main-content" class="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 bg-white text-black px-4 py-2 rounded-lg z-[10000]">
-    Skip to main content
-  </a>
+<body class="h-[100dvh] flex flex-col lg:flex-row relative overflow-hidden">
 
-  <!-- Screen reader announcements -->
-  <div role="status" aria-live="polite" aria-atomic="true" class="sr-only" id="sr-announcements"></div>
+  <!-- --- BACKGROUND FX --- -->
+  <!-- Subtle ambient glow for depth -->
+  <div class="absolute inset-0 pointer-events-none overflow-hidden z-0">
+    <div class="absolute -top-[20%] -left-[10%] w-[70%] h-[70%] bg-indigo-950/20 blur-[160px] rounded-full opacity-60"></div>
+    <div class="absolute top-[40%] -right-[10%] w-[60%] h-[60%] bg-slate-900/40 blur-[140px] rounded-full opacity-60"></div>
+    <canvas id="bg-canvas" class="absolute inset-0 w-full h-full opacity-20"></canvas>
+  </div>
 
-  <!-- Three.js background canvas -->
-  <canvas id="bg-canvas" class="fixed inset-0 w-full h-full" aria-hidden="true"></canvas>
-
-  <!-- Theme toggle -->
-  <button id="theme-toggle"
-          aria-label="Toggle dark/light mode"
-          class="fixed top-4 left-4 panel rounded-lg p-2 z-40 hover:scale-105 transition-transform">
-    <svg id="moon-icon" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
-    </svg>
-    <svg id="sun-icon" class="w-5 h-5 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
-    </svg>
-  </button>
-
-  <!-- Main content -->
-  <div id="main-content" class="max-w-7xl mx-auto py-6 md:py-10 px-4 md:px-6 space-y-6 relative z-10">
-
+  <!-- --- DESKTOP SIDEBAR (320px fixed) --- -->
+  <aside class="hidden lg:flex w-[320px] flex-col border-r border-white/5 bg-slate-950/90 backdrop-blur-xl z-30 shrink-0 shadow-2xl">
     <!-- Header -->
-    <header class="flex flex-col gap-3" role="banner">
-      <div class="inline-flex items-center gap-3 bg-sky-500/10 text-sky-200 px-3 py-1.5 rounded-full w-fit border border-sky-500/20">
-        <span class="w-2 h-2 rounded-full bg-emerald-300 animate-pulse" aria-hidden="true"></span>
-        <span class="text-xs tracking-[0.25em] uppercase">CMA-ES · WebAssembly</span>
+    <div class="h-16 flex items-center px-6 border-b border-white/5 shrink-0 bg-slate-950/50">
+      <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center shadow-lg shadow-indigo-500/20 mr-3">
+        <i data-lucide="cpu" class="w-4 h-4 text-white"></i>
       </div>
-
-      <div class="flex flex-col gap-2">
-        <h1 class="text-sky-50">Benchmark Playground</h1>
-        <p class="text-slate-300 max-w-3xl text-sm md:text-base">
-          Pick a classic test function and watch CMA-ES explore in 2D. Smooth log-loss, animated scatter, live best tracker. Tunable λ, σ, seeds.
-        </p>
-        <div class="flex flex-wrap gap-2">
-          <button id="learn-mode-toggle"
-                  class="px-3 py-1.5 rounded-lg bg-amber-500/20 text-amber-100 border border-amber-400/40 text-sm hover:bg-amber-400/25">
-            ✨ Learn mode
-          </button>
-        </div>
+      <div>
+        <h1 class="font-bold text-sm text-slate-100 tracking-tight">WASM CMA-ES</h1>
+        <p class="text-[10px] text-slate-500 font-medium uppercase tracking-wider">Optimization Studio</p>
       </div>
+    </div>
 
-      <!-- Info cards -->
-      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-        <div class="panel rounded-xl p-4 flex flex-col gap-1">
-          <div class="flex items-center gap-2 text-sky-200 text-xs">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
-            </svg>
-            <span>Bundle</span>
-          </div>
-          <p class="text-base md:text-lg font-semibold text-sky-100">Sequential (pkg)</p>
-          <p class="text-xs text-slate-400">Rust + WASM with optional SIMD acceleration</p>
-        </div>
+    <!-- Controls Scroll Area -->
+    <div class="flex-1 overflow-y-auto p-5 space-y-8 no-scrollbar" id="desktop-controls">
+      
+      <!-- Primary Action -->
+      <button id="run" class="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-medium rounded-lg shadow-[0_4px_20px_rgba(99,102,241,0.3),0_0_0_1px_rgba(255,255,255,0.1)_inset] transition-all active:scale-[0.98] flex items-center justify-center gap-2 group relative overflow-hidden">
+        <div class="absolute inset-0 bg-gradient-to-r from-white/0 via-white/10 to-white/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700 ease-in-out"></div>
+        <i data-lucide="play" class="w-4 h-4 fill-current"></i>
+        <span>Run Optimization</span>
+      </button>
 
-        <div class="panel rounded-xl p-4 flex flex-col gap-1">
-          <div class="flex items-center gap-2 text-amber-200 text-xs">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
-            </svg>
-            <span>Rendering</span>
-          </div>
-          <p class="text-base md:text-lg font-semibold text-amber-100">D3 + Three.js + GSAP</p>
-          <p class="text-xs text-slate-400">Real-time 2D/3D visualization with animations</p>
-        </div>
-
-        <div class="panel rounded-xl p-4 flex flex-col gap-1 sm:col-span-2 lg:col-span-1">
-          <div class="flex items-center gap-2 text-emerald-200 text-xs">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-            </svg>
-            <span>Status</span>
-          </div>
-          <p id="status" class="text-base md:text-lg font-semibold text-emerald-200" aria-live="polite">Idle</p>
-          <p class="text-xs text-slate-400">Real-time iteration tracking</p>
-        </div>
-      </div>
-
-      <!-- Progress bar (hidden by default) -->
-      <div id="progress-container" class="hidden">
-        <div class="progress-bar">
-          <div id="progress-fill" class="progress-bar-fill" style="width: 0%"></div>
-        </div>
-        <div class="flex justify-between text-xs text-slate-400 mt-1">
-          <span id="progress-text">Initializing...</span>
-          <span id="progress-percent">0%</span>
-        </div>
-      </div>
-    </header>
-
-    <!-- Main visualization section -->
-    <section class="grid grid-cols-1 lg:grid-cols-3 gap-4" role="main">
-
-      <!-- Controls panel (desktop) - hidden on mobile, replaced by bottom sheet -->
-      <div id="controls-panel" class="panel rounded-xl p-4 md:p-5 space-y-4 col-span-1 mobile-hide">
-        <h2 class="text-lg font-semibold text-slate-100 mb-2">Controls</h2>
-
-        <!-- Benchmark selector -->
-        <div class="space-y-2">
-          <label for="bench" class="block text-sm font-medium text-slate-300">
-            Benchmark Function
-            <button class="ml-1 text-slate-400 hover:text-slate-200"
-                    data-tooltip="Select an optimization test function"
-                    aria-label="Help for benchmark selection">
-              <svg class="w-3.5 h-3.5 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </button>
-          </label>
-          <select id="bench"
-                  class="w-full rounded-lg bg-slate-900 border border-slate-700 px-3 py-2.5 text-slate-100 focus:border-sky-500 focus:ring-1 focus:ring-sky-500"
-                  aria-describedby="bench-help">
-            <option value="sphere">Sphere (smooth, unimodal)</option>
-            <option value="rastrigin">Rastrigin (highly multimodal)</option>
-            <option value="ackley">Ackley (nearly flat valleys)</option>
-            <option value="griewank">Griewank (oscillatory)</option>
-            <option value="schwefel">Schwefel (deceptive)</option>
-            <option value="levy">Levy (broad ridges)</option>
-            <option value="zakharov">Zakharov (ill-conditioned)</option>
-            <option value="alpine">Alpine N1 (many spikes)</option>
-            <option value="bukin6">Bukin N.6 (steep valley)</option>
+      <!-- Section: Benchmark -->
+      <div class="space-y-3">
+        <label class="text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2">
+          <i data-lucide="target" class="w-3 h-3"></i> Objective Function
+        </label>
+        <div class="relative group">
+          <select id="bench" class="stripe-input appearance-none cursor-pointer pr-8 bg-slate-900/50">
+            <option value="sphere">Sphere</option>
+            <option value="rastrigin">Rastrigin</option>
+            <option value="ackley">Ackley</option>
+            <option value="griewank">Griewank</option>
+            <option value="schwefel">Schwefel</option>
+            <option value="levy">Levy</option>
+            <option value="zakharov">Zakharov</option>
+            <option value="alpine">Alpine N1</option>
+            <option value="bukin6">Bukin N.6</option>
           </select>
-          <p id="bench-help" class="text-xs text-slate-400 sr-only">
-            Choose a mathematical test function for the optimizer to minimize
-          </p>
-
-          <!-- Curated presets -->
-          <div class="space-y-2 mt-3">
-            <div class="flex items-center justify-between gap-2">
-              <span class="text-sm font-medium text-slate-200">Curated presets</span>
-              <span class="text-xs text-slate-400">One-click apply</span>
-            </div>
-            <div id="preset-gallery" class="grid grid-cols-1 sm:grid-cols-2 gap-2"></div>
-          </div>
-
-          <!-- Recently used -->
-          <div class="space-y-2">
-            <div class="flex items-center justify-between gap-2">
-              <span class="text-sm font-medium text-slate-200">Recently used</span>
-              <span class="text-xs text-slate-400">Last few presets</span>
-            </div>
-            <div id="recent-presets" class="flex flex-wrap gap-2"></div>
-          </div>
-
-          <!-- Run comparisons -->
-          <div class="space-y-2 mt-4">
-            <div class="flex items-center justify-between gap-2">
-              <span class="text-sm font-medium text-slate-200">Run comparisons</span>
-            </div>
-            <div class="flex flex-wrap gap-2">
-              <button id="pin-run" class="px-3 py-2 rounded-lg bg-slate-800 text-slate-100 text-sm border border-slate-700 hover:border-sky-500">
-                Pin this run
-              </button>
-              <button id="compare-last" class="px-3 py-2 rounded-lg bg-slate-800 text-slate-100 text-sm border border-slate-700 hover:border-emerald-400">
-                Compare to last run
-              </button>
-              <button id="clear-overlays" class="px-3 py-2 rounded-lg bg-slate-900 text-slate-200 text-sm border border-slate-700 hover:border-red-400">
-                Clear overlays
-              </button>
-            </div>
-            <div id="comparison-legend" class="flex flex-wrap gap-2 text-xs text-slate-200"></div>
-            <div id="comparison-stats" class="text-xs text-slate-200 space-y-1"></div>
-          </div>
-
-          <!-- High-D visualizations (shown when dim > 2) -->
-          <div class="space-y-2 mt-4">
-            <div class="flex items-center justify-between gap-2">
-              <span class="text-sm font-medium text-slate-200">High-D views</span>
-              <span class="text-xs text-slate-400">Dim > 2</span>
-            </div>
-            <div id="pca-container" class="panel rounded-lg p-2 border border-slate-700 bg-slate-900">
-              <div class="text-xs text-slate-400 mb-1">PCA scatter (candidates)</div>
-              <svg id="pca-scatter" width="100%" height="180"></svg>
-            </div>
-            <div id="parcoords-container" class="panel rounded-lg p-2 border border-slate-700 bg-slate-900">
-              <div class="text-xs text-slate-400 mb-1">Parallel coordinates (run stats)</div>
-              <svg id="param-parcoords" width="100%" height="180"></svg>
-            </div>
-          </div>
+          <i data-lucide="chevron-down" class="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none group-hover:text-slate-300 transition-colors"></i>
         </div>
-
-        <!-- Parameter recommendations banner -->
-        <div id="param-recommendation" class="hidden bg-amber-500/10 border border-amber-500/30 rounded-lg p-3 text-xs">
-          <div class="flex items-start gap-2">
-            <svg class="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-            </svg>
-            <div>
-              <strong class="text-amber-300">Recommendation:</strong>
-              <span id="param-recommendation-text" class="text-slate-300"></span>
-            </div>
-          </div>
-        </div>
-
-        <!-- Lambda and Sigma -->
-        <div class="grid grid-cols-2 gap-3">
-          <div>
-            <label for="lambda" class="block text-sm font-medium text-slate-300">
-              Lambda (λ)
-              <button class="ml-1 text-slate-400 hover:text-slate-200"
-                      data-tooltip="Population size: number of candidates per iteration"
-                      aria-label="Help for lambda parameter">
-                <svg class="w-3.5 h-3.5 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </button>
-            </label>
-            <input id="lambda" type="number" value="32" min="4" max="128"
-                   class="w-full rounded-lg bg-slate-900 border border-slate-700 px-3 py-2 text-slate-100 focus:border-sky-500 focus:ring-1 focus:ring-sky-500"
-                   aria-label="Lambda population size parameter" />
-          </div>
-          <div>
-            <label for="sigma" class="block text-sm font-medium text-slate-300">
-              Sigma (σ)
-              <button class="ml-1 text-slate-400 hover:text-slate-200"
-                      data-tooltip="Step size: controls exploration radius"
-                      aria-label="Help for sigma parameter">
-                <svg class="w-3.5 h-3.5 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </button>
-            </label>
-            <input id="sigma" type="number" value="1.2" step="0.1"
-                   class="w-full rounded-lg bg-slate-900 border border-slate-700 px-3 py-2 text-slate-100 focus:border-sky-500 focus:ring-1 focus:ring-sky-500"
-                   aria-label="Sigma step size parameter" />
-          </div>
-        </div>
-
-        <!-- Iterations and Seed -->
-        <div class="grid grid-cols-2 gap-3">
-          <div>
-            <label for="iters" class="block text-sm font-medium text-slate-300">Max Iterations</label>
-            <input id="iters" type="number" value="250" min="10" max="2000"
-                   class="w-full rounded-lg bg-slate-900 border border-slate-700 px-3 py-2 text-slate-100 focus:border-sky-500 focus:ring-1 focus:ring-sky-500"
-                   aria-label="Maximum number of iterations" />
-          </div>
-          <div>
-            <label for="seed" class="block text-sm font-medium text-slate-300">Random Seed</label>
-            <input id="seed" type="number" value="42" min="0"
-                   class="w-full rounded-lg bg-slate-900 border border-slate-700 px-3 py-2 text-slate-100 focus:border-sky-500 focus:ring-1 focus:ring-sky-500"
-                   aria-label="Random seed for reproducibility" />
-          </div>
-        </div>
-
-        <!-- Dimension (fixed at 2) -->
-        <div class="space-y-2">
-          <label class="block text-sm font-medium text-slate-300">Dimension</label>
-          <input id="dim" type="range" value="2" min="2" max="2" class="w-full" disabled aria-label="Problem dimension (fixed at 2D)" />
-          <div class="text-sm text-slate-300" id="dim-label">2D for surface visualization</div>
-        </div>
-
-        <!-- Projection mode -->
-          <div class="grid grid-cols-2 gap-3">
-            <div>
-              <label for="projection" class="block text-sm font-medium text-slate-300">Projection</label>
-              <select id="projection" class="w-full rounded-lg bg-slate-900 border border-slate-700 px-3 py-2 text-slate-100" disabled>
-                <option value="first2">First 2 dimensions</option>
-              </select>
-            </div>
-            <div>
-              <label for="covar-model" class="block text-sm font-medium text-slate-300">Covariance model</label>
-              <select id="covar-model" class="w-full rounded-lg bg-slate-900 border border-slate-700 px-3 py-2 text-slate-100">
-                <option value="auto" selected>Auto</option>
-                <option value="full">Full</option>
-                <option value="lm">Limited-memory</option>
-                <option value="sep">Separable</option>
-              </select>
-            </div>
-          </div>
-
-          <div class="grid grid-cols-2 gap-3">
-            <div>
-              <label class="block text-sm font-medium text-slate-300">Race Mode</label>
-              <button id="run-race"
-                      class="w-full bg-fuchsia-500 hover:bg-fuchsia-400 text-slate-900 font-semibold px-3 py-2 rounded-lg transition"
-                      aria-label="Run speed comparison between WASM and JavaScript">
-                ⚡ WASM vs JS
-            </button>
-          </div>
-        </div>
-
-        <!-- Bounds -->
-        <div class="space-y-2">
-          <label class="flex items-center gap-2 text-sm font-medium text-slate-300">
-            <input id="bounds-toggle" type="checkbox" class="accent-sky-400 w-4 h-4" aria-describedby="bounds-help" />
-            Enable Bounds
-          </label>
-          <p id="bounds-help" class="text-xs text-slate-400 sr-only">
-            Constrain the search space to specified lower and upper bounds
-          </p>
-          <div class="grid grid-cols-2 gap-3">
-            <input id="bound-lo" type="number" value="-5" step="0.5"
-                   class="rounded-lg bg-slate-900 border border-slate-700 px-3 py-2 text-slate-100"
-                   aria-label="Lower bound" placeholder="Lower" />
-            <input id="bound-hi" type="number" value="5" step="0.5"
-                   class="rounded-lg bg-slate-900 border border-slate-700 px-3 py-2 text-slate-100"
-                   aria-label="Upper bound" placeholder="Upper" />
-          </div>
-        </div>
-
-        <!-- Constraint handling -->
-        <div class="space-y-2">
-          <label class="block text-sm font-medium text-slate-300">Constraint Handling</label>
-          <div class="grid grid-cols-2 gap-2 text-sm text-slate-200">
-            <div>
-              <span class="text-xs text-slate-400">Strategy</span>
-              <select id="constraint-strategy" class="w-full rounded-lg bg-slate-900 border border-slate-700 px-2 py-2 text-slate-100">
-                <option value="penalty">Penalty</option>
-                <option value="project">Project</option>
-                <option value="resample">Resample</option>
-              </select>
-            </div>
-            <div>
-              <span class="text-xs text-slate-400">Resample cap</span>
-              <input id="resample-cap" type="number" value="5" min="1" max="50"
-                     class="w-full rounded-lg bg-slate-900 border border-slate-700 px-2 py-2 text-slate-100" />
-            </div>
-            <div>
-              <span class="text-xs text-slate-400">Penalty weight</span>
-              <input id="penalty-weight" type="number" value="1000" step="10" min="0"
-                     class="w-full rounded-lg bg-slate-900 border border-slate-700 px-2 py-2 text-slate-100" />
-            </div>
-          </div>
-          <p class="text-xs text-slate-400">Penalty uses augmented Lagrangian (linear + quadratic) on bound violations.</p>
-        </div>
-
-        <!-- Noise model -->
-        <div class="space-y-2">
-          <label class="block text-sm font-medium text-slate-300">Noise Model</label>
-          <div class="grid grid-cols-3 gap-2 text-sm text-slate-200">
-            <div class="space-y-1">
-              <span class="text-xs text-slate-400">Samples/pt</span>
-              <input id="noise-samples" type="number" value="1" min="1" max="16"
-                     class="w-full rounded-lg bg-slate-900 border border-slate-700 px-2 py-1 text-slate-100" />
-            </div>
-            <div class="space-y-1">
-              <span class="text-xs text-slate-400">Max samples</span>
-              <input id="noise-max" type="number" value="8" min="1" max="32"
-                     class="w-full rounded-lg bg-slate-900 border border-slate-700 px-2 py-1 text-slate-100" />
-            </div>
-            <div class="space-y-1 flex items-end">
-              <label class="flex items-center gap-2 text-xs text-slate-400">
-                <input id="noise-adaptive" type="checkbox" class="accent-sky-400 w-3.5 h-3.5" />
-                Adaptive
-              </label>
-            </div>
-          </div>
-          <label class="flex items-center gap-2 text-sm font-medium text-amber-200 mt-2">
-            <input id="noisy-toggle" type="checkbox" class="accent-amber-400 w-4 h-4" />
-            Noisy objective (robust sampling)
-          </label>
-          <p class="text-xs text-slate-400">Turns on adaptive multi-sampling (3–9 samples) for noisy benchmarks.</p>
-        </div>
-
-        <!-- Action buttons -->
-        <div class="flex flex-col gap-3 pt-2">
-          <button id="run"
-                  class="relative overflow-hidden font-semibold px-6 py-3.5 rounded-xl text-slate-900 w-full"
-                  aria-label="Run CMA-ES optimization">
-            <span class="absolute inset-0 rounded-xl bg-gradient-to-r from-cyan-400 via-fuchsia-400 to-amber-300 animate-pulse"></span>
-            <span class="absolute inset-[2px] rounded-xl bg-slate-900"></span>
-            <span class="relative z-10 flex items-center justify-center gap-2 text-cyan-100">
-              🚀 Run Optimization
-            </span>
-          </button>
-
-          <div class="grid grid-cols-2 gap-2">
-            <button id="run-js"
-                    class="bg-amber-400/90 hover:bg-amber-300 text-slate-900 font-semibold px-4 py-2.5 rounded-lg transition"
-                    aria-label="Run JavaScript baseline comparison">
-              JS Baseline
-            </button>
-            <button id="start-tutorial"
-                    class="bg-purple-500/90 hover:bg-purple-400 text-white font-semibold px-4 py-2.5 rounded-lg transition"
-                    aria-label="Start interactive tutorial">
-              📚 Tutorial
-            </button>
-          </div>
-        </div>
-
-        <!-- Info text -->
-        <div class="text-xs text-slate-400 space-y-1 pt-2 border-t border-slate-700">
-          <div><span class="text-emerald-300 font-medium">WASM:</span> Rust CMA-ES compiled to WebAssembly with SIMD</div>
-          <div><span class="text-amber-300 font-medium">JS Baseline:</span> Vanilla JavaScript (μ+λ) strategy for comparison</div>
-          <div id="timing" class="text-slate-200 font-semibold mt-2"></div>
-        </div>
+        <p class="text-[11px] text-slate-500 leading-relaxed px-1" id="param-recommendation-text">
+          Smooth convex function. Good for convergence speed tests.
+        </p>
       </div>
 
-      <!-- Visualization panels -->
-      <div class="col-span-1 lg:col-span-2 space-y-4">
-
-        <!-- Chart panel -->
-        <div class="panel rounded-xl p-4 md:p-5 space-y-4 overflow-hidden">
-          <div class="flex justify-between items-center flex-wrap gap-2">
-            <div class="flex items-center gap-2">
-              <span class="text-sm font-medium text-slate-300">Convergence Plot</span>
-
-              <!-- Chart type toggle -->
-              <div class="hidden md:flex items-center gap-1 bg-slate-800/50 rounded-lg p-1">
-                <button id="chart-log"
-                        class="px-2 py-1 text-xs rounded bg-sky-500 text-white font-medium"
-                        aria-label="Logarithmic scale"
-                        aria-pressed="true">
-                  Log
-                </button>
-                <button id="chart-linear"
-                        class="px-2 py-1 text-xs rounded text-slate-400 hover:text-slate-200"
-                        aria-label="Linear scale"
-                        aria-pressed="false">
-                  Linear
-                </button>
-              </div>
-            </div>
-
-            <div class="flex items-center gap-2">
-              <span id="best-display" class="text-sm font-mono text-slate-300" aria-live="polite">–</span>
-
-              <!-- Export chart button -->
-              <button id="export-chart"
-                      class="px-2 py-1 text-xs bg-slate-700 hover:bg-slate-600 rounded text-slate-200"
-                      aria-label="Export chart as PNG">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                </svg>
-              </button>
-            </div>
+      <!-- Section: Parameters -->
+      <div class="space-y-4">
+        <div class="flex items-center justify-between">
+          <label class="text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2">
+            <i data-lucide="sliders" class="w-3 h-3"></i> Hyperparameters
+          </label>
+          <button id="toggle-advanced-desktop" class="text-[10px] text-indigo-400 hover:text-indigo-300 font-medium transition-colors">
+            Advanced
+          </button>
+        </div>
+        
+        <div class="grid grid-cols-2 gap-3">
+          <div class="space-y-1.5">
+            <label class="text-[11px] font-medium text-slate-400">Population (λ)</label>
+            <input id="lambda" type="number" value="32" class="stripe-input font-mono text-center" />
           </div>
-
-          <div class="relative">
-            <svg id="line" class="chart w-full" viewBox="0 0 800 320" preserveAspectRatio="xMidYMid meet"></svg>
-
-            <!-- Crosshair tooltip -->
-            <div id="chart-tooltip" class="tooltip">
-              <div class="text-xs"></div>
-            </div>
+          <div class="space-y-1.5">
+            <label class="text-[11px] font-medium text-slate-400">Step Size (σ)</label>
+            <input id="sigma" type="number" value="1.2" step="0.1" class="stripe-input font-mono text-center" />
           </div>
         </div>
 
-        <!-- 3D surface panel -->
-        <div class="panel rounded-xl p-4 md:p-5 space-y-4 overflow-hidden">
-          <div class="flex justify-between items-center flex-wrap gap-2">
-            <span class="text-sm font-medium text-slate-300">3D Surface + Candidates</span>
-
-            <div class="flex items-center gap-2">
-              <span id="iter-display" class="text-sm text-slate-300" aria-live="polite">Iter 0</span>
-
-              <!-- 3D view controls -->
-              <div class="hidden md:flex items-center gap-1">
-                <button id="view-top"
-                        class="px-2 py-1 text-xs bg-slate-700 hover:bg-slate-600 rounded text-slate-200"
-                        aria-label="Top view"
-                        title="Top view">
-                  ⬆️
-                </button>
-                <button id="view-iso"
-                        class="px-2 py-1 text-xs bg-slate-700 hover:bg-slate-600 rounded text-slate-200"
-                        aria-label="Isometric view"
-                        title="Isometric view">
-                  📐
-                </button>
-                <button id="capture-3d"
-                        class="px-2 py-1 text-xs bg-slate-700 hover:bg-slate-600 rounded text-slate-200"
-                        aria-label="Capture screenshot">
-                  📷
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <div class="relative">
-            <canvas id="three-canvas"
-                    class="w-full rounded-lg"
-                    style="height: clamp(250px, 50vw, 380px);"
-                    role="img"
-                    aria-label="3D visualization of optimization surface with candidate points"></canvas>
-
-            <!-- Timeline scrubber -->
-            <div class="absolute bottom-2 left-2 right-2 flex items-center gap-2 bg-black/40 backdrop-blur-sm rounded-lg p-2">
-              <input id="scrub"
-                     type="range"
-                     min="0"
-                     max="0"
-                     value="0"
-                     class="w-full h-2 rounded-lg appearance-none bg-slate-600 cursor-pointer accent-sky-500"
-                     aria-label="Timeline scrubber" />
-              <button id="scrub-play"
-                      class="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 min-w-[2rem] text-center"
-                      aria-label="Play/pause timeline">
-                ▶
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- Mobile bottom sheet (controls) -->
-    <div id="mobile-sheet" class="bottom-sheet panel md:hidden" role="region" aria-label="Control panel">
-      <div class="handle-bar" role="button" tabindex="0" aria-label="Drag to open controls"></div>
-
-      <div class="px-4 pb-4 max-h-[70vh] overflow-y-auto">
-        <div class="flex justify-between items-center mb-4">
-          <h2 class="text-lg font-semibold text-slate-100">Controls</h2>
-          <button id="close-sheet" class="text-slate-400 hover:text-slate-200" aria-label="Close control panel">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-            </svg>
-          </button>
-        </div>
-
-        <!-- Mobile controls content (duplicate of desktop controls) -->
-        <div class="space-y-4">
-          <!-- Quick run button -->
-          <button id="run-mobile"
-                  class="relative overflow-hidden font-semibold px-6 py-3.5 rounded-xl text-slate-900 w-full"
-                  aria-label="Run CMA-ES optimization">
-            <span class="absolute inset-0 rounded-xl bg-gradient-to-r from-cyan-400 via-fuchsia-400 to-amber-300"></span>
-            <span class="absolute inset-[2px] rounded-xl bg-slate-900"></span>
-            <span class="relative z-10 flex items-center justify-center gap-2 text-cyan-100">
-              🚀 Run Optimization
-            </span>
-          </button>
-
-          <!-- Benchmark selector -->
-          <div class="space-y-2">
-            <label for="bench-mobile" class="block text-sm font-medium text-slate-300">Benchmark</label>
-            <select id="bench-mobile" class="w-full rounded-lg bg-slate-900 border border-slate-700 px-3 py-2.5 text-slate-100">
-              <option value="sphere">Sphere</option>
-              <option value="rastrigin">Rastrigin</option>
-              <option value="ackley">Ackley</option>
-              <option value="griewank">Griewank</option>
-              <option value="schwefel">Schwefel</option>
-              <option value="levy">Levy</option>
-              <option value="zakharov">Zakharov</option>
-              <option value="alpine">Alpine N1</option>
-              <option value="bukin6">Bukin N.6</option>
-            </select>
-
-            <div class="space-y-2 mt-2">
-              <div class="flex items-center justify-between gap-2">
-                <span class="text-sm font-medium text-slate-200">Presets</span>
-                <span class="text-xs text-slate-400">Tap to apply</span>
-              </div>
-              <div id="preset-gallery-mobile" class="grid grid-cols-1 gap-2"></div>
-            </div>
-
-            <div class="space-y-2">
-              <div class="flex items-center justify-between gap-2">
-                <span class="text-sm font-medium text-slate-200">Recent</span>
-                <span class="text-xs text-slate-400">Last few</span>
-              </div>
-              <div id="recent-presets-mobile" class="flex flex-wrap gap-2"></div>
-            </div>
-          </div>
-
-          <!-- Lambda and Sigma -->
-          <div class="grid grid-cols-2 gap-3">
-            <div>
-              <label for="lambda-mobile" class="block text-sm font-medium text-slate-300">Lambda</label>
-              <input id="lambda-mobile" type="number" value="32" min="4" max="128"
-                     class="w-full rounded-lg bg-slate-900 border border-slate-700 px-3 py-2 text-slate-100" />
-            </div>
-            <div>
-              <label for="sigma-mobile" class="block text-sm font-medium text-slate-300">Sigma</label>
-              <input id="sigma-mobile" type="number" value="1.2" step="0.1"
-                     class="w-full rounded-lg bg-slate-900 border border-slate-700 px-3 py-2 text-slate-100" />
-            </div>
-          </div>
-
-          <div class="space-y-2">
-            <label class="flex items-center gap-2 text-sm font-medium text-amber-200">
-              <input id="noisy-toggle-mobile" type="checkbox" class="accent-amber-400 w-4 h-4" />
-              Noisy objective (robust sampling)
-            </label>
-          </div>
-
-          <div class="grid grid-cols-2 gap-3">
-            <div>
-              <label for="covar-model-mobile" class="block text-sm font-medium text-slate-300">Covariance model</label>
-              <select id="covar-model-mobile" class="w-full rounded-lg bg-slate-900 border border-slate-700 px-3 py-2 text-slate-100">
-                <option value="auto" selected>Auto</option>
-                <option value="full">Full</option>
-                <option value="lm">Limited-memory</option>
-                <option value="sep">Separable</option>
-              </select>
-            </div>
-          </div>
-
-          <!-- More controls toggle -->
-          <button id="toggle-advanced" class="w-full text-sm text-sky-400 hover:text-sky-300 flex items-center justify-center gap-1">
-            <span>Advanced Options</span>
-            <svg class="w-4 h-4 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-            </svg>
-          </button>
-
-          <div id="advanced-options" class="hidden space-y-4 pt-2 border-t border-slate-700">
-            <!-- Iterations and Seed -->
+        <!-- Advanced Collapsible -->
+        <div id="advanced-options" class="hidden space-y-4 pt-4 border-t border-white/5 animate-in fade-in slide-in-from-top-2 duration-200">
+            <!-- Iters/Seed -->
             <div class="grid grid-cols-2 gap-3">
-              <div>
-                <label for="iters-mobile" class="block text-sm font-medium text-slate-300">Max Iters</label>
-                <input id="iters-mobile" type="number" value="250" min="10" max="2000"
-                       class="w-full rounded-lg bg-slate-900 border border-slate-700 px-3 py-2 text-slate-100" />
+              <div class="space-y-1.5">
+                <label class="text-[11px] font-medium text-slate-400">Max Iters</label>
+                <input id="iters" type="number" value="250" class="stripe-input font-mono text-center" />
               </div>
-              <div>
-                <label for="seed-mobile" class="block text-sm font-medium text-slate-300">Seed</label>
-                <input id="seed-mobile" type="number" value="42" min="0"
-                       class="w-full rounded-lg bg-slate-900 border border-slate-700 px-3 py-2 text-slate-100" />
+              <div class="space-y-1.5">
+                <label class="text-[11px] font-medium text-slate-400">Seed</label>
+                <input id="seed" type="number" value="42" class="stripe-input font-mono text-center" />
               </div>
             </div>
-          </div>
+
+            <!-- Constraints Group -->
+            <div class="bg-slate-900/50 p-3 rounded-lg border border-white/5 space-y-3">
+              <div class="flex items-center justify-between">
+                <span class="text-[11px] font-medium text-slate-300">Bounds Constraint</span>
+                <input id="bounds-toggle" type="checkbox" class="accent-indigo-500 w-3.5 h-3.5 rounded cursor-pointer" />
+              </div>
+              <div class="grid grid-cols-2 gap-2">
+                <input id="bound-lo" type="number" value="-5" placeholder="Min" class="stripe-input text-xs text-center py-1.5" />
+                <input id="bound-hi" type="number" value="5" placeholder="Max" class="stripe-input text-xs text-center py-1.5" />
+              </div>
+            </div>
+
+            <!-- Toggles -->
+            <label class="flex items-center justify-between p-3 bg-slate-900/50 rounded-lg border border-white/5 cursor-pointer hover:bg-white/5 transition-colors">
+               <span class="text-[11px] font-medium text-slate-300">Noisy Objective</span>
+               <input id="noisy-toggle" type="checkbox" class="w-3.5 h-3.5 accent-amber-500 rounded cursor-pointer" />
+            </label>
+
+            <!-- Covariance Model -->
+             <div class="space-y-1.5">
+               <label class="text-[11px] font-medium text-slate-400">Covariance Model</label>
+               <div class="relative">
+                 <select id="covar-model" class="stripe-input appearance-none bg-slate-900/50 text-xs pr-8">
+                   <option value="auto">Auto (Adaptive)</option>
+                   <option value="full">Full Matrix (Precise)</option>
+                   <option value="sep">Separable (Diagonal)</option>
+                   <option value="lm">Limited Memory</option>
+                 </select>
+                 <i data-lucide="chevron-down" class="absolute right-3 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-500 pointer-events-none"></i>
+               </div>
+             </div>
         </div>
       </div>
     </div>
 
-    <!-- Quickstart carousel -->
-    <section class="panel rounded-xl p-4 md:p-5 space-y-3">
-      <div class="flex items-center justify-between">
-        <div>
-          <p class="text-xs text-slate-400">Onboarding</p>
-          <h3 class="text-base md:text-lg text-sky-100 font-semibold">Quickstart</h3>
+    <!-- Footer Actions -->
+    <div class="p-4 border-t border-white/5 bg-slate-950/50 flex items-center justify-between gap-2 text-slate-400">
+      <button id="help-btn" class="p-2 hover:text-white hover:bg-white/5 rounded-md transition-colors" title="Shortcuts">
+        <i data-lucide="keyboard" class="w-4 h-4"></i>
+      </button>
+      <div class="h-4 w-[1px] bg-white/10"></div>
+      <button id="share-config" class="p-2 hover:text-white hover:bg-white/5 rounded-md transition-colors" title="Share Config">
+        <i data-lucide="share-2" class="w-4 h-4"></i>
+      </button>
+      <button id="export-csv" class="p-2 hover:text-white hover:bg-white/5 rounded-md transition-colors" title="Export CSV">
+        <i data-lucide="file-text" class="w-4 h-4"></i>
+      </button>
+      <button id="export-json" class="p-2 hover:text-white hover:bg-white/5 rounded-md transition-colors" title="Export JSON">
+        <i data-lucide="code" class="w-4 h-4"></i>
+      </button>
+    </div>
+  </aside>
+
+
+  <!-- --- MOBILE HEADER (Floating Pill) --- -->
+  <header class="lg:hidden fixed top-4 inset-x-4 z-40 flex items-center justify-between pointer-events-none">
+    <div class="glass px-4 py-2.5 rounded-full flex items-center gap-3 pointer-events-auto shadow-lg">
+      <div class="w-2 h-2 bg-indigo-500 rounded-full animate-pulse shadow-[0_0_8px_#6366f1]"></div>
+      <span class="font-semibold text-xs tracking-wide text-slate-100">STUDIO</span>
+    </div>
+    
+    <div class="glass p-2 rounded-full pointer-events-auto shadow-lg flex items-center">
+      <button id="mobile-menu-btn" class="p-1 text-slate-300 active:text-white transition-colors">
+        <i data-lucide="settings-2" class="w-5 h-5"></i>
+      </button>
+    </div>
+  </header>
+
+
+  <!-- --- MAIN CONTENT --- -->
+  <main class="flex-1 relative flex flex-col h-full overflow-hidden bg-[#020617] z-10">
+    
+    <!-- Progress Bar -->
+    <div id="progress-container" class="absolute top-0 left-0 right-0 h-0.5 bg-indigo-500/20 z-50 hidden">
+      <div id="progress-fill" class="h-full bg-indigo-500 shadow-[0_0_10px_#6366f1] transition-all duration-100" style="width: 0%"></div>
+    </div>
+
+    <!-- Visualization Area -->
+    <div class="flex-1 relative flex flex-col">
+      
+      <!-- 3D Viewport (Full Space) -->
+      <div id="canvas-wrapper" class="absolute inset-0 z-0">
+        <canvas id="three-canvas" class="block w-full h-full outline-none"></canvas>
+      </div>
+
+      <!-- Overlay HUD (Floating Capsules) -->
+      <div class="absolute top-20 lg:top-6 left-6 right-6 flex justify-between items-start pointer-events-none z-20">
+        <!-- Iteration Counter -->
+        <div class="glass px-4 py-2 rounded-full flex items-center gap-3 shadow-xl border-white/10 backdrop-blur-xl animate-in fade-in slide-in-from-top-4 duration-500">
+          <i data-lucide="box" class="w-3.5 h-3.5 text-indigo-400"></i>
+          <span id="iter-display" class="text-xs font-mono font-medium text-slate-200 tabular-nums">Iter 0</span>
         </div>
-        <div class="flex items-center gap-2 text-xs">
-          <button id="quickstart-prev" class="px-2 py-1 rounded bg-slate-800 text-slate-200">◀</button>
-          <button id="quickstart-next" class="px-2 py-1 rounded bg-slate-800 text-slate-200">▶</button>
+        
+        <!-- Best Fitness -->
+        <div class="glass px-4 py-2 rounded-full flex items-center gap-3 shadow-xl border-white/10 backdrop-blur-xl animate-in fade-in slide-in-from-top-4 duration-500 delay-75">
+          <i data-lucide="trophy" class="w-3.5 h-3.5 text-emerald-400"></i>
+          <span id="best-display" class="text-xs font-mono font-medium text-emerald-200 tabular-nums">--</span>
         </div>
       </div>
-      <div id="quickstart-content" class="text-sm text-slate-200 leading-relaxed"></div>
-      <div id="quickstart-dots" class="flex gap-1"></div>
-    </section>
 
-    <!-- Educational sections -->
-    <section class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-
-      <!-- Custom objective editor -->
-      <div class="panel rounded-xl p-4 md:p-5 space-y-3">
-        <div class="flex items-center justify-between flex-wrap gap-2">
-          <div>
-            <p class="text-xs text-slate-400">Custom Objective</p>
-            <h3 class="text-base md:text-lg text-sky-100 font-semibold">Write Your Own f(x)</h3>
-          </div>
-          <button id="apply-custom"
-                  class="bg-emerald-400/90 hover:bg-emerald-300 text-slate-900 font-semibold px-3 py-2 rounded-lg transition"
-                  aria-label="Apply custom objective function">
-            Apply
-          </button>
+      <!-- Center Empty State -->
+      <div id="three-empty" class="absolute inset-0 flex flex-col items-center justify-center bg-black/40 backdrop-blur-sm z-10 transition-opacity duration-300">
+        <div class="w-20 h-20 bg-white/5 rounded-2xl flex items-center justify-center mb-6 animate-pulse border border-white/10 shadow-2xl rotate-3">
+          <i data-lucide="layers" class="w-10 h-10 text-slate-500"></i>
         </div>
+        <h2 class="text-lg font-semibold text-white tracking-tight">Visualization Ready</h2>
+        <p class="text-sm text-slate-400 mt-2 mb-6 max-w-xs text-center leading-relaxed">
+          Configure your parameters in the sidebar or tap start to begin the simulation.
+        </p>
+        <button id="three-empty-run" class="px-6 py-2.5 bg-white/10 hover:bg-white/20 text-white text-sm font-medium rounded-full transition-all backdrop-blur-md border border-white/10 pointer-events-auto hover:scale-105 active:scale-95">
+          Start Optimization
+        </button>
+      </div>
 
-        <div class="text-xs text-slate-400">
-          Function signature: <code class="bg-slate-800 px-1 py-0.5 rounded">f(x: number[]): number</code>
-        </div>
-
-        <!-- Editor container - will use Monaco on desktop, textarea on mobile -->
-        <div id="editor-container" class="w-full h-56 rounded-lg overflow-hidden border border-slate-700 bg-slate-900">
-          <div id="editor" class="w-full h-full"></div>
+      <!-- Bottom Scrubber -->
+      <div class="absolute bottom-8 lg:bottom-8 left-6 right-6 lg:left-1/2 lg:-translate-x-1/2 lg:w-[400px] glass rounded-2xl p-2 flex items-center gap-4 opacity-0 transition-all duration-500 translate-y-4 pointer-events-auto z-20 shadow-2xl border-white/10" id="scrub-panel">
+        <button id="scrub-play" class="w-9 h-9 rounded-xl bg-indigo-600 hover:bg-indigo-500 flex items-center justify-center text-white shrink-0 transition-transform active:scale-90 shadow-lg">
+          <i data-lucide="play" class="w-4 h-4 ml-0.5 fill-current"></i>
+        </button>
+        <div class="flex-1 relative h-full flex items-center pr-2">
+          <input id="scrub" type="range" min="0" max="0" value="0" class="stripe-range accent-indigo-500" />
         </div>
       </div>
 
-      <!-- Benchmark documentation -->
-      <div class="panel rounded-xl p-4 md:p-5 space-y-3">
-        <div class="flex items-center justify-between">
-          <div>
-            <p class="text-xs text-slate-400">Documentation</p>
-            <h3 class="text-base md:text-lg text-amber-100 font-semibold">Function Details</h3>
+      <!-- Chart Overlay (Bottom Right Desktop) -->
+      <div class="hidden lg:block absolute bottom-8 right-8 w-[360px] h-[180px] glass rounded-xl p-0 border border-white/10 shadow-2xl overflow-hidden backdrop-blur-md z-20">
+        <svg id="line" class="w-full h-full"></svg>
+        <div id="chart-empty" class="absolute inset-0 flex items-center justify-center text-slate-500 text-xs font-medium uppercase tracking-widest">
+          Waiting for data
+        </div>
+      </div>
+    </div>
+  </main>
+
+
+  <!-- --- MOBILE SHEET (Cupertino) --- -->
+  <div id="cupertino-pane" class="hidden">
+    <div class="pt-2 pb-24 px-6 text-slate-200 space-y-8 h-full overflow-y-auto">
+      
+      <!-- Handle -->
+      <div class="w-10 h-1 bg-slate-700 rounded-full mx-auto mb-6"></div>
+
+      <!-- Run Button (Mobile) -->
+      <button id="run-mobile" class="w-full py-4 bg-gradient-to-r from-indigo-600 to-violet-600 text-white font-bold text-lg rounded-2xl shadow-xl shadow-indigo-500/20 active:scale-[0.98] transition-transform flex items-center justify-center gap-3 border border-white/10">
+        <i data-lucide="rocket" class="w-5 h-5"></i>
+        Run Optimization
+      </button>
+
+      <!-- Benchmark Picker -->
+      <div class="space-y-3">
+        <label class="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Benchmark</label>
+        <div class="grid grid-cols-2 gap-3" id="mobile-bench-grid">
+          <!-- Populated by JS -->
+        </div>
+        <select id="bench-mobile" class="hidden"></select>
+      </div>
+
+      <!-- Parameters Sliders -->
+      <div class="space-y-6 bg-white/5 p-5 rounded-2xl border border-white/5">
+        <div class="space-y-4">
+           <div class="flex justify-between items-end">
+             <label class="text-xs font-bold text-slate-400 uppercase tracking-wider">Population (λ)</label>
+             <span id="lambda-display" class="text-sm font-mono text-indigo-400 font-bold">32</span>
+           </div>
+           <input id="lambda-slider" type="range" min="4" max="128" value="32" class="stripe-range" />
+           <input id="lambda-mobile" type="number" class="hidden" value="32">
+        </div>
+
+        <div class="space-y-4 pt-2">
+           <div class="flex justify-between items-end">
+             <label class="text-xs font-bold text-slate-400 uppercase tracking-wider">Step Size (σ)</label>
+             <span id="sigma-display" class="text-sm font-mono text-indigo-400 font-bold">1.2</span>
+           </div>
+           <input id="sigma-slider" type="range" min="0.1" max="5.0" step="0.1" value="1.2" class="stripe-range" />
+           <input id="sigma-mobile" type="number" class="hidden" value="1.2">
+        </div>
+      </div>
+
+      <!-- Toggles -->
+      <div class="flex flex-col gap-3">
+        <label class="flex items-center justify-between p-4 bg-white/5 rounded-xl border border-white/5 active:bg-white/10 transition-colors">
+           <span class="font-medium text-sm text-slate-200">Noisy Objective</span>
+           <input id="noisy-toggle-mobile" type="checkbox" class="w-5 h-5 accent-amber-500 rounded" />
+        </label>
+        
+        <label class="flex items-center justify-between p-4 bg-white/5 rounded-xl border border-white/5 active:bg-white/10 transition-colors">
+           <span class="font-medium text-sm text-slate-200">Constrained (Bounds)</span>
+           <input id="bounds-toggle-mobile" type="checkbox" class="w-5 h-5 accent-indigo-500 rounded" />
+        </label>
+      </div>
+
+      <!-- Hidden Sync Fields -->
+      <div class="hidden">
+        <div id="preset-gallery-mobile"></div>
+        <input id="iters-mobile" value="250">
+        <input id="seed-mobile" value="42">
+        <input id="bound-lo-mobile" value="-5">
+        <input id="bound-hi-mobile" value="5">
+        <select id="covar-model-mobile"><option value="auto">Auto</option></select>
+        <div id="recent-presets"></div><div id="recent-presets-mobile"></div>
+        <button id="chart-empty-sample"></button><button id="chart-empty-run"></button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- --- HELP OVERLAY --- -->
+  <div id="help-overlay" class="fixed inset-0 z-[60] bg-slate-950/80 backdrop-blur-md hidden flex items-center justify-center p-4 transition-all duration-300 opacity-0 scale-95" tabindex="-1">
+    <div class="bg-slate-900 border border-white/10 rounded-2xl max-w-2xl w-full max-h-[90vh] flex flex-col shadow-2xl relative overflow-hidden">
+      <!-- Glow FX -->
+      <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-indigo-500 to-purple-500"></div>
+      
+      <button id="help-close-x" class="absolute top-4 right-4 p-2 text-slate-400 hover:text-white transition-colors rounded-lg hover:bg-white/5 z-10">
+        <i data-lucide="x" class="w-5 h-5"></i>
+      </button>
+      
+      <div class="p-6 border-b border-white/5 bg-slate-900/50">
+        <h2 class="text-lg font-bold text-white flex items-center gap-2">
+          <i data-lucide="keyboard" class="w-5 h-5 text-indigo-400"></i>
+          Keyboard Shortcuts
+        </h2>
+      </div>
+      
+      <div class="flex-1 overflow-y-auto p-6 space-y-6">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div class="space-y-2">
+            <div class="flex items-center justify-between p-3 bg-white/5 rounded-lg border border-white/5">
+              <span class="text-xs font-medium text-slate-300">Run Optimization</span>
+              <kbd class="px-2 py-1 bg-white/10 rounded text-[10px] font-mono text-white border border-white/10">Space</kbd>
+            </div>
+            <div class="flex items-center justify-between p-3 bg-white/5 rounded-lg border border-white/5">
+              <span class="text-xs font-medium text-slate-300">Reset to Default</span>
+              <kbd class="px-2 py-1 bg-white/10 rounded text-[10px] font-mono text-white border border-white/10">R</kbd>
+            </div>
+            <div class="flex items-center justify-between p-3 bg-white/5 rounded-lg border border-white/5">
+              <span class="text-xs font-medium text-slate-300">Show/Hide Help</span>
+              <kbd class="px-2 py-1 bg-white/10 rounded text-[10px] font-mono text-white border border-white/10">H / ?</kbd>
+            </div>
+          </div>
+          
+          <div class="space-y-2">
+            <div class="flex items-center justify-between p-3 bg-white/5 rounded-lg border border-white/5">
+              <span class="text-xs font-medium text-slate-300">Share Config</span>
+              <div class="flex gap-1">
+                <kbd class="px-2 py-1 bg-white/10 rounded text-[10px] font-mono text-white border border-white/10">Ctrl</kbd>
+                <kbd class="px-2 py-1 bg-white/10 rounded text-[10px] font-mono text-white border border-white/10">S</kbd>
+              </div>
+            </div>
+            <div class="flex items-center justify-between p-3 bg-white/5 rounded-lg border border-white/5">
+              <span class="text-xs font-medium text-slate-300">Export CSV</span>
+              <div class="flex gap-1">
+                <kbd class="px-2 py-1 bg-white/10 rounded text-[10px] font-mono text-white border border-white/10">Ctrl</kbd>
+                <kbd class="px-2 py-1 bg-white/10 rounded text-[10px] font-mono text-white border border-white/10">E</kbd>
+              </div>
+            </div>
           </div>
         </div>
 
-        <div id="benchmark-info" class="space-y-3 text-sm text-slate-300">
-          <div class="grid grid-cols-2 gap-2 text-xs">
-            <div>
-              <span class="text-slate-400">Type:</span>
-              <span id="info-type" class="ml-1 font-medium">–</span>
-            </div>
-            <div>
-              <span class="text-slate-400">Difficulty:</span>
-              <span id="info-difficulty" class="ml-1" aria-label="Difficulty rating">–</span>
-            </div>
-            <div>
-              <span class="text-slate-400">Global minimum:</span>
-              <span id="info-minimum" class="ml-1 font-mono text-xs">–</span>
-            </div>
-            <div>
-              <span class="text-slate-400">Domain:</span>
-              <span id="info-domain" class="ml-1 font-mono text-xs">–</span>
-            </div>
-          </div>
+        <div class="bg-indigo-950/30 border border-indigo-500/20 rounded-xl p-5">
+          <h3 class="text-xs font-bold text-indigo-300 mb-2 uppercase tracking-wider">About</h3>
+          <p class="text-xs text-slate-400 leading-relaxed">
+            This studio visualizes the <strong>CMA-ES</strong> (Covariance Matrix Adaptation Evolution Strategy) algorithm. The 3D ellipsoid represents the mutation distribution ($\mathcal{N}(0, C)$) scaled by step size $\sigma$.
+          </p>
+        </div>
+      </div>
+      
+      <div class="p-6 border-t border-white/5 flex justify-end gap-3 bg-slate-900/50">
+        <button id="start-tutorial" class="px-4 py-2 bg-white/5 hover:bg-white/10 text-slate-300 rounded-lg text-xs font-bold uppercase tracking-wide transition-colors">
+          Start Tutorial
+        </button>
+        <button id="help-close-btn" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-bold uppercase tracking-wide transition-colors shadow-lg shadow-indigo-500/20">
+          Close
+        </button>
+      </div>
+    </div>
+  </div>
 
-          <div>
-            <span class="text-slate-400 text-xs">Description:</span>
-            <p id="info-description" class="mt-1 leading-relaxed">
-              Select a benchmark function to view detailed information about its characteristics and optimization challenges.
+  <!-- --- TUTORIAL OVERLAY --- -->
+  <div id="tutorial-overlay" class="fixed inset-0 z-[70] bg-slate-950/90 backdrop-blur-md hidden flex items-center justify-center p-6 transition-opacity duration-300">
+    <div class="bg-slate-900 border border-white/10 rounded-3xl max-w-md w-full shadow-2xl relative overflow-hidden p-1">
+        <div class="p-8 relative z-10 text-center space-y-6 bg-slate-900 rounded-[20px]">
+            <div class="w-16 h-16 bg-indigo-500/10 text-indigo-400 rounded-2xl flex items-center justify-center mx-auto mb-4 ring-1 ring-indigo-500/30 shadow-[0_0_30px_rgba(99,102,241,0.15)]">
+            <i data-lucide="graduation-cap" class="w-8 h-8"></i>
+            </div>
+            
+            <div class="space-y-2">
+            <h3 class="text-xl font-bold text-white tracking-tight">How it Works</h3>
+            <p id="tutorial-step-count" class="text-[10px] font-mono text-indigo-400 uppercase tracking-widest font-bold">Step 1 of 5</p>
+            </div>
+            
+            <p id="tutorial-content" class="text-slate-400 text-sm leading-relaxed min-h-[80px]">
+            Loading tutorial content...
             </p>
-          </div>
-
-          <a id="info-link" href="#" target="_blank" rel="noopener noreferrer"
-             class="inline-flex items-center gap-1 text-xs text-cyan-400 hover:text-cyan-300 hover:underline">
-            <span>Learn more</span>
-            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-            </svg>
-          </a>
+            
+            <div class="flex gap-3 pt-4">
+            <button id="tutorial-skip" class="flex-1 py-3 text-slate-500 hover:text-slate-300 text-xs font-bold uppercase tracking-wide transition-colors">Skip</button>
+            <div class="flex gap-2 flex-[2]">
+                <button id="tutorial-prev" class="flex-1 py-3 bg-white/5 hover:bg-white/10 text-white rounded-xl text-xs font-bold uppercase tracking-wide transition-colors border border-white/5">Back</button>
+                <button id="tutorial-next" class="flex-1 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold uppercase tracking-wide transition-colors shadow-lg shadow-indigo-500/25">Next</button>
+            </div>
+            </div>
+            
+            <button id="tutorial-close" class="absolute top-2 right-2 p-3 text-slate-500 hover:text-white transition-colors">
+            <i data-lucide="x" class="w-5 h-5"></i>
+            </button>
         </div>
-      </div>
-
-      <!-- Glossary -->
-      <div class="panel rounded-xl p-4 md:p-5 space-y-3">
-        <div class="flex items-center justify-between">
-          <div>
-            <p class="text-xs text-slate-400">Glossary</p>
-            <h3 class="text-base md:text-lg text-sky-100 font-semibold">Key Terms</h3>
-          </div>
-        </div>
-        <ul id="glossary-list" class="space-y-2 text-sm text-slate-200"></ul>
-      </div>
-    </section>
-
-    <!-- Preset gallery -->
-    <section class="panel rounded-xl p-4 md:p-5 space-y-4">
-      <div class="flex items-center justify-between">
-        <div>
-          <p class="text-xs text-slate-400">Quick Start</p>
-          <h3 class="text-base md:text-lg text-purple-100 font-semibold">Preset Configurations</h3>
-        </div>
-      </div>
-
-      <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <!-- Presets will be dynamically populated -->
-        <button class="preset-card panel rounded-lg p-3 hover:scale-105 transition-transform text-left" data-preset="quick-sphere">
-          <div class="text-sm font-semibold text-sky-200 mb-1">⚡ Quick Sphere</div>
-          <div class="text-xs text-slate-400">Fast convergence demo</div>
-        </button>
-
-        <button class="preset-card panel rounded-lg p-3 hover:scale-105 transition-transform text-left" data-preset="multimodal">
-          <div class="text-sm font-semibold text-amber-200 mb-1">🎯 Multimodal</div>
-          <div class="text-xs text-slate-400">Rastrigin challenge</div>
-        </button>
-
-        <button class="preset-card panel rounded-lg p-3 hover:scale-105 transition-transform text-left" data-preset="high-dim">
-          <div class="text-sm font-semibold text-purple-200 mb-1">📊 High Lambda</div>
-          <div class="text-xs text-slate-400">Large population test</div>
-        </button>
-
-        <button class="preset-card panel rounded-lg p-3 hover:scale-105 transition-transform text-left" data-preset="bounded">
-          <div class="text-sm font-semibold text-emerald-200 mb-1">🔒 Bounded</div>
-          <div class="text-xs text-slate-400">Constrained search</div>
-        </button>
-      </div>
-    </section>
-
-    <!-- Share and export section -->
-    <section class="panel rounded-xl p-4 md:p-5">
-      <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div>
-          <p class="text-xs text-slate-400">Share & Export</p>
-          <h3 class="text-base md:text-lg text-slate-100 font-semibold">Save Your Results</h3>
-        </div>
-
-        <div class="flex flex-wrap gap-2">
-          <button id="share-config"
-                  class="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm font-medium text-slate-200 flex items-center gap-2 transition">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
-            </svg>
-            Share Config
-          </button>
-
-          <button id="export-csv"
-                  class="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm font-medium text-slate-200 flex items-center gap-2 transition">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
-            Export CSV
-          </button>
-
-          <button id="export-json"
-                  class="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm font-medium text-slate-200 flex items-center gap-2 transition">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2" />
-            </svg>
-            Export JSON
-          </button>
-        </div>
-      </div>
-    </section>
-  </div>
-
-  <!-- HUD (stats overlay) -->
-  <div id="hud" class="fixed top-4 right-4 panel rounded-xl p-3 text-xs text-slate-200 space-y-1 min-w-[180px] md:min-w-[220px] hidden md:block" role="complementary" aria-label="Statistics">
-    <div class="flex justify-between"><span>FPS</span><span id="hud-fps" aria-live="polite">–</span></div>
-    <div class="flex justify-between"><span>WASM (last)</span><span id="hud-wasm" aria-live="polite">–</span></div>
-    <div class="flex justify-between"><span>JS baseline</span><span id="hud-js" aria-live="polite">–</span></div>
-    <div class="flex justify-between"><span>Iter/sec</span><span id="hud-iter" aria-live="polite">–</span></div>
-    <div class="flex justify-between"><span>Model</span><span id="hud-model" aria-live="polite">auto</span></div>
-  </div>
-
-  <!-- Race results (bottom-right overlay) -->
-  <div id="race-results" class="fixed bottom-4 right-4 panel rounded-xl p-3 text-xs text-slate-200 space-y-1 min-w-[200px] md:min-w-[260px] hidden" role="alert" aria-live="polite"></div>
-
-  <!-- Tutorial overlay -->
-  <div id="tutorial-overlay" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-50 items-center justify-center p-4">
-    <div class="panel rounded-xl p-6 max-w-2xl w-full space-y-4 text-slate-100">
-      <div class="flex justify-between items-start">
-        <div>
-          <h3 class="text-xl font-semibold mb-1">Interactive Tutorial</h3>
-          <p class="text-sm text-slate-400" id="tutorial-step-count">Step 1 of 6</p>
-        </div>
-        <button id="tutorial-close" class="text-slate-400 hover:text-slate-200" aria-label="Close tutorial">
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        </button>
-      </div>
-
-      <div id="tutorial-content" class="text-sm leading-relaxed">
-        <p>Welcome to the CMA-ES Benchmark Playground! This tutorial will guide you through the key features.</p>
-      </div>
-
-      <div class="flex justify-between items-center pt-2 border-t border-slate-700">
-        <button id="tutorial-skip" class="px-4 py-2 text-sm text-slate-400 hover:text-slate-200">
-          Skip Tutorial
-        </button>
-        <div class="flex gap-2">
-          <button id="tutorial-prev" class="px-4 py-2 rounded-lg bg-slate-800 text-slate-200 hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed">
-            Previous
-          </button>
-          <button id="tutorial-next" class="px-4 py-2 rounded-lg bg-sky-500 text-white hover:bg-sky-600">
-            Next
-          </button>
-        </div>
-      </div>
     </div>
   </div>
 
-  <!-- Command palette (Cmd+K) -->
-  <div id="command-palette-backdrop" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-[9996]"></div>
-  <div id="command-palette" class="command-palette panel rounded-xl overflow-hidden" role="dialog" aria-label="Command palette">
-    <div class="p-4 border-b border-slate-700">
-      <input id="command-search"
-             type="text"
-             placeholder="Type a command or search..."
-             class="w-full bg-transparent text-slate-100 placeholder-slate-400 outline-none text-sm"
-             aria-label="Search commands" />
-    </div>
+  <!-- --- TOASTS --- -->
+  <div id="toast-container" class="fixed top-6 left-1/2 -translate-x-1/2 z-[100] flex flex-col gap-3 w-full max-w-xs pointer-events-none"></div>
 
-    <div id="command-list" class="max-h-96 overflow-y-auto">
-      <!-- Commands populated dynamically -->
-    </div>
-  </div>
+  <!-- --- SCRIPTS --- -->
+  <script>
+    lucide.createIcons();
 
-  <!-- Toast container -->
-  <div id="toast-container" class="fixed bottom-4 left-4 md:left-auto md:right-4 z-[9999] space-y-2 max-w-sm" role="region" aria-live="polite"></div>
+    // --- UTILS ---
+    const vibrate = () => { if (navigator.vibrate) navigator.vibrate(10); };
+    const $ = (id) => document.getElementById(id);
 
+    // --- CUPERTINO PANE ---
+    let pane;
+    window.addEventListener('DOMContentLoaded', () => {
+      const el = document.getElementById('cupertino-pane');
+      el.classList.remove('hidden');
+      
+      pane = new CupertinoPane('#cupertino-pane', {
+        parentElement: 'body',
+        breaks: {
+            middle: { enabled: true, height: 480, bounce: true },
+            bottom: { enabled: true, height: 80 },
+        },
+        backdrop: true,
+        backdropOpacity: 0.6,
+        bottomClose: false,
+        buttonDestroy: false,
+        darkMode: true,
+        showDraggable: true,
+        dragBy: ['.pane', '.sheet-handle'], // handle added by library or custom? Library adds one if showDraggable true
+        onTransitionStart: (e) => { /* haptics? */ }
+      });
+      
+      const menuBtn = document.getElementById('mobile-menu-btn');
+      menuBtn.addEventListener('click', () => {
+          pane.present({ animate: true });
+          vibrate();
+      });
+    });
+
+    // --- SYNC LOGIC ---
+    const benches = [
+      { id: 'sphere', name: 'Sphere', color: 'from-blue-500 to-cyan-500' },
+      { id: 'rastrigin', name: 'Rastrigin', color: 'from-amber-500 to-orange-500' },
+      { id: 'ackley', name: 'Ackley', color: 'from-purple-500 to-pink-500' },
+      { id: 'griewank', name: 'Griewank', color: 'from-emerald-500 to-teal-500' },
+      { id: 'schwefel', name: 'Schwefel', color: 'from-red-500 to-rose-500' },
+      { id: 'levy', name: 'Levy', color: 'from-indigo-500 to-violet-500' }
+    ];
+    
+    const benchGrid = $('mobile-bench-grid');
+    const realBenchSelect = $('bench-mobile');
+
+    benches.forEach(b => {
+      const btn = document.createElement('button');
+      btn.className = `p-3 rounded-xl border border-white/5 bg-white/5 hover:bg-white/10 transition-all text-left relative overflow-hidden group`;
+      btn.innerHTML = `
+        <div class="absolute inset-0 opacity-0 group-hover:opacity-10 bg-gradient-to-br ${b.color} transition-opacity duration-300"></div>
+        <span class="relative z-10 text-xs font-bold text-slate-300 group-hover:text-white tracking-wide">${b.name}</span>
+        <div class="absolute bottom-0 left-0 h-0.5 w-full bg-gradient-to-r ${b.color} opacity-50"></div>
+      `;
+      
+      btn.addEventListener('click', () => {
+        realBenchSelect.value = b.id;
+        realBenchSelect.dispatchEvent(new Event('change'));
+        vibrate();
+        Array.from(benchGrid.children).forEach(c => c.classList.remove('ring-1', 'ring-indigo-500', 'bg-indigo-500/10'));
+        btn.classList.add('ring-1', 'ring-indigo-500', 'bg-indigo-500/10');
+      });
+      benchGrid.appendChild(btn);
+    });
+
+    // Slider Sync
+    const setupSlider = (sliderId, inputId, displayId) => {
+      const slider = $(sliderId);
+      const input = $(inputId);
+      const display = $(displayId);
+      
+      slider.addEventListener('input', () => {
+        input.value = slider.value;
+        input.dispatchEvent(new Event('change')); 
+        if (display) display.textContent = slider.value;
+        if (navigator.vibrate) navigator.vibrate(2);
+      });
+      
+      setInterval(() => {
+        if (input.value != slider.value) {
+          slider.value = input.value;
+          if (display) display.textContent = input.value;
+        }
+      }, 500);
+    };
+
+    setupSlider('lambda-slider', 'lambda-mobile', 'lambda-display');
+    setupSlider('sigma-slider', 'sigma-mobile', 'sigma-display');
+
+    // --- SCRUBBER VISIBILITY ---
+    const iterDisplay = $('iter-display');
+    const scrubPanel = $('scrub-panel');
+    const observer = new MutationObserver(() => {
+      if (iterDisplay.textContent !== 'Iter 0') {
+         scrubPanel.style.opacity = '1';
+         scrubPanel.style.transform = 'translateY(0)';
+         scrubPanel.style.pointerEvents = 'auto';
+      }
+    });
+    observer.observe(iterDisplay, { childList: true, characterData: true, subtree: true });
+
+    // --- HELP ANIMATION ---
+    const helpOverlay = $('help-overlay');
+    const observerHelp = new MutationObserver((mutations) => {
+        mutations.forEach((mutation) => {
+            if (mutation.attributeName === 'class') {
+                const isHidden = helpOverlay.classList.contains('hidden');
+                if (!isHidden) {
+                    setTimeout(() => {
+                        helpOverlay.classList.remove('opacity-0', 'scale-95');
+                    }, 10);
+                } else {
+                    helpOverlay.classList.add('opacity-0', 'scale-95');
+                }
+            }
+        });
+    });
+    if (helpOverlay) observerHelp.observe(helpOverlay, { attributes: true });
+
+  </script>
+
+  <!-- Load Logic -->
   <script type="module" src="./app.js"></script>
 </body>
 </html>

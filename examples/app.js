@@ -1,58 +1,25 @@
     import init, { WasmCmaes } from "../pkg/cmaes_wasm.js";
-    import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js";
+    import * as THREE from "three";
     import { OrbitControls } from "https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/controls/OrbitControls.js";
+    import { EffectComposer } from "https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/postprocessing/EffectComposer.js";
+    import { RenderPass } from "https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/postprocessing/RenderPass.js";
+    import { UnrealBloomPass } from "https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/postprocessing/UnrealBloomPass.js";
+
+    const mustGet = (id) => {
+      const el = document.getElementById(id);
+      if (!el) throw new Error(`Missing element #${id}`);
+      return el;
+    };
+
+    const swPath = () => location.pathname.startsWith('/wasm_cmaes/') ? '/wasm_cmaes/sw.js' : '/sw.js';
 
     // Load lucide icon paths (fallback-safe)
     let lucideIcons = {};
     try {
-      const res = await fetch("https://unpkg.com/lucide-static@0.321.0/icons.json");
+      const res = await fetch("https://cdn.jsdelivr.net/npm/lucide-static@0.321.0/icons.json");
       if (res.ok) lucideIcons = await res.json();
     } catch (_) {
       lucideIcons = {};
-    }
-
-    // Monaco editor setup
-    const defaultCustomCode = `// Return a scalar fitness; lower is better
-function f(x) {
-  // Example: shifted bowl
-  const cx = 1.5, cy = -2.0;
-  const dx = x[0] - cx;
-  const dy = x[1] - cy;
-  return dx*dx + dy*dy + 0.1*Math.sin(3*dx) + 0.1*Math.cos(3*dy);
-}`;
-    let editor;
-    const editorContainer = mustGet('editor');
-    const monacoReady = new Promise((resolve) => {
-      window.require.config({ paths: { vs: "https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs" } });
-      window.require(["vs/editor/editor.main"], () => {
-        editor = monaco.editor.create(editorContainer, {
-          value: defaultCustomCode,
-          language: "javascript",
-          theme: "vs-dark",
-          fontSize: 13,
-          minimap: { enabled: false },
-          automaticLayout: true,
-        });
-        resolve(editor);
-      });
-    });
-
-    let customFn = (x) => x.reduce((s, v) => s + v * v, 0);
-
-    function safeCustom(x) {
-      try {
-        const v = customFn(x);
-        return Number.isFinite(v) ? v : 1e9;
-      } catch (e) {
-        console.warn('Custom fn error', e);
-        return 1e9;
-      }
-    }
-
-    function validateCustomCode(code) {
-      const banned = /(window|document|globalThis|Function|eval|import|fetch|Worker|XMLHttpRequest)/i;
-      if (banned.test(code)) throw new Error('Disallowed identifier detected');
-      if (code.length > 4000) throw new Error('Code too long');
     }
 
     const benchFns = {
@@ -218,8 +185,20 @@ function f(x) {
         iters: 350,
         seed: 123,
         bounds: { enabled: true, lo: -500, hi: 500 }
+      },
+      {
+        id: 'bounded',
+        label: 'Bounded',
+        bench: 'bukin6',
+        lambda: 36,
+        sigma: 1.6,
+        iters: 280,
+        seed: 11,
+        bounds: { enabled: true, lo: -15, hi: 15 }
       }
     ];
+    const presetMap = {};
+    curatedPresets.forEach((p) => { presetMap[p.id] = p; });
 
     const RECENTS_KEY = 'cmaes-recent-presets';
     const MAX_RECENTS = 6;
@@ -311,28 +290,19 @@ function f(x) {
       }
     });
 
-    const mustGet = (id) => {
-      const el = document.getElementById(id);
-      if (!el) throw new Error(`Missing DOM id: ${id}`);
-      return el;
-    };
-
     const benchSelect = mustGet('bench');
-    const dimInput = mustGet('dim');
-    const dimLabel = mustGet('dim-label');
-    const projectionSelect = mustGet('projection');
+    // Removed missing inputs: dimInput, projectionSelect, etc.
     const boundsToggle = mustGet('bounds-toggle');
     const boundLo = mustGet('bound-lo');
     const boundHi = mustGet('bound-hi');
-    const noiseSamples = mustGet('noise-samples');
-    const noiseMax = mustGet('noise-max');
-    const noiseAdaptive = mustGet('noise-adaptive');
+    const noiseSamples = document.getElementById('noise-samples');
+    const noiseMax = document.getElementById('noise-max');
+    const noiseAdaptive = document.getElementById('noise-adaptive');
     const constraintStrategySelect = document.getElementById('constraint-strategy');
     const resampleCapInput = document.getElementById('resample-cap');
     const penaltyWeightInput = document.getElementById('penalty-weight');
     const noisyToggle = mustGet('noisy-toggle');
-    const timingEl = mustGet('timing');
-    const raceResults = mustGet('race-results');
+    // timingEl, raceResults removed
     const lambdaInput = mustGet('lambda');
     const sigmaInput = mustGet('sigma');
     const itersInput = mustGet('iters');
@@ -342,32 +312,44 @@ function f(x) {
     const helpCloseBtn = document.getElementById('help-close-btn');
     const helpCloseX = document.getElementById('help-close-x');
     const helpBtn = document.getElementById('help-btn');
-    const exportCsvBtn = mustGet('export-csv');
-    const exportJsonBtn = mustGet('export-json');
-    const shareBtn = mustGet('share-config');
+    const exportCsvBtn = document.getElementById('export-csv');
+    const exportJsonBtn = document.getElementById('export-json');
+    const shareBtn = document.getElementById('share-config');
     const runBtn = mustGet('run');
-    const runJsBtn = mustGet('run-js');
-    const runRaceBtn = mustGet('run-race');
-    const applyCustomBtn = mustGet('apply-custom');
+    const runJsBtn = document.getElementById('run-js');
+    const runRaceBtn = document.getElementById('run-race');
     const toastContainer = mustGet('toast-container');
-    const bgCanvas = mustGet('bg-canvas');
-    const pinRunBtn = mustGet('pin-run');
-    const compareLastBtn = mustGet('compare-last');
-    const clearOverlaysBtn = mustGet('clear-overlays');
-    const comparisonLegend = mustGet('comparison-legend');
-    const comparisonStats = mustGet('comparison-stats');
-    const pcaContainer = mustGet('pca-container');
-    const pcaSvg = mustGet('pca-scatter');
-    const parcoordsSvg = mustGet('param-parcoords');
-    const paramRec = mustGet('param-recommendation');
-    const paramRecText = mustGet('param-recommendation-text');
-    const hudModel = mustGet('hud-model');
+    const bgCanvas = document.getElementById('bg-canvas');
+    const pinRunBtn = document.getElementById('pin-run');
+    const compareLastBtn = document.getElementById('compare-last');
+    const clearOverlaysBtn = document.getElementById('clear-overlays');
+    const comparisonLegend = document.getElementById('comparison-legend');
+    const comparisonStats = document.getElementById('comparison-stats');
+    const pcaContainer = document.getElementById('pca-container');
+    const pcaSvg = document.getElementById('pca-scatter');
+    const parcoordsSvg = document.getElementById('param-parcoords');
+    const paramRec = document.getElementById('param-recommendation');
+    const paramRecText = document.getElementById('param-recommendation-text');
+    const hudModel = document.getElementById('hud-model');
     const learnToggle = document.getElementById('learn-mode-toggle');
     const quickstartContent = document.getElementById('quickstart-content');
     const quickstartPrev = document.getElementById('quickstart-prev');
     const quickstartNext = document.getElementById('quickstart-next');
     const quickstartDots = document.getElementById('quickstart-dots');
     const glossaryList = document.getElementById('glossary-list');
+    const quickRunBtn = document.getElementById('quick-run');
+    const runSampleBtn = document.getElementById('run-sample');
+    const chartEmpty = document.getElementById('chart-empty');
+    const chartEmptyRun = document.getElementById('chart-empty-run');
+    const chartEmptySample = document.getElementById('chart-empty-sample');
+    const threeEmpty = document.getElementById('three-empty');
+    const threeEmptyRun = document.getElementById('three-empty-run');
+    const threeEmptySample = document.getElementById('three-empty-sample');
+    const statusChip = document.getElementById('status-chip');
+    const bestChip = document.getElementById('best-chip');
+    const openMobileControls = document.getElementById('open-mobile-controls');
+    const reduceMotionToggle = document.getElementById('reduce-motion-toggle');
+    const inlinePresetBtns = Array.from(document.querySelectorAll('.preset-inline'));
 
     const lineSvg = d3.select('#line');
     const scrub = mustGet('scrub');
@@ -386,7 +368,34 @@ function f(x) {
     const parcoordsAxes = ['lambda', 'sigma', 'cond', 'best'];
     let lastImproveIter = 0;
     let stallNotified = false;
+    let hasRun = false;
+    let reduceMotionOn = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     // quickstartIdx, learnModeOn, learnBadges already declared above
+
+    const setRunState = (ran) => {
+      hasRun = ran;
+      [chartEmpty, threeEmpty].forEach((el) => {
+        if (!el) return;
+        el.classList.toggle('hidden', ran);
+      });
+    };
+
+    const updateChips = () => {
+      // statusEl is removed, so skipping status chip update from statusEl
+      // Instead we can update direct HUD elements if needed.
+      // The "Overlay HUD" has iter-display and best-display which are handled elsewhere.
+    };
+
+    let bgRaf = null;
+    const stopBg = () => {
+      if (bgRaf) cancelAnimationFrame(bgRaf);
+      bgRaf = null;
+    };
+    const applyReduceMotion = () => {
+      document.body.classList.toggle('reduce-motion', reduceMotionOn);
+      if (reduceMotionToggle) reduceMotionToggle.setAttribute('aria-pressed', reduceMotionOn ? 'true' : 'false');
+      if (reduceMotionOn) stopBg(); else startBg();
+    };
 
     function constraintConfig() {
       return {
@@ -448,19 +457,21 @@ function f(x) {
     const linePath = lineG.append('path').attr('fill', 'none').attr('stroke', '#38bdf8').attr('stroke-width', 2.5);
     const overlayGroup = lineG.append('g').attr('class', 'overlay-lines');
 
-    const statusEl = mustGet('status');
+    // Removed statusEl, hudFps, hudWasm, hudJs, hudIter mustGets to prevent crash
     const bestEl = mustGet('best-display');
     const iterEl = mustGet('iter-display');
-    const hudFps = mustGet('hud-fps');
-    const hudWasm = mustGet('hud-wasm');
-    const hudJs = mustGet('hud-js');
-    const hudIter = mustGet('hud-iter');
+    const hudFps = document.getElementById('hud-fps');
+    const hudWasm = document.getElementById('hud-wasm');
+    const hudJs = document.getElementById('hud-js');
+    const hudIter = document.getElementById('hud-iter');
+
+    setRunState(false);
+    updateChips();
 
     let wasmInitialized = false;
 
     function currentDim(benchKey) {
-      dimInput.value = 2;
-      dimLabel.textContent = '2D surface view';
+      // dimInput and dimLabel removed
       return 2;
     }
 
@@ -476,12 +487,12 @@ function f(x) {
           upper: new Float64Array(Array(dim).fill(hi)),
         };
       }
-      const samples = Number(noiseSamples.value) || 1;
-      const maxS = Number(noiseMax.value) || 8;
+      const samples = Number(noiseSamples?.value) || 1;
+      const maxS = Number(noiseMax?.value) || 8;
       opts.noise = {
         samplesPerPoint: samples,
         maxSamplesPerPoint: maxS,
-        adaptive: noiseAdaptive.checked,
+        adaptive: noiseAdaptive?.checked ?? false,
       };
       if (noisyToggle.checked) {
         opts.noise.samplesPerPoint = Math.max(opts.noise.samplesPerPoint, 3);
@@ -579,6 +590,11 @@ function f(x) {
       if (toast) showToast(`Preset applied: ${preset.label}`, 'success', 1800);
     }
 
+    const applyPresetById = (id, opts = {}) => {
+      const preset = presetMap[id];
+      if (preset) applyPreset(preset, opts);
+    };
+
     function renderPresetGallery(isMobile = false) {
       const host = document.getElementById(isMobile ? 'preset-gallery-mobile' : 'preset-gallery');
       if (!host) return;
@@ -662,8 +678,8 @@ function f(x) {
     }
 
     function projectCandidates(cands, bestVec, dim) {
-      const mode = projectionSelect.value === 'auto' ? (dim > 2 ? 'pca' : 'first2') : projectionSelect.value;
-      if (dim <= 2 || mode === 'first2') {
+      // Always use PCA if > 2D, otherwise direct
+      if (dim <= 2) {
         const pts = cands.map((v) => ({ x: v[0], y: v[1] }));
         const b = { x: bestVec[0], y: bestVec[1] };
         return { pts, b };
@@ -724,24 +740,53 @@ function f(x) {
     // Three.js scene
     const threeCanvas = mustGet('three-canvas');
     const renderer = new THREE.WebGLRenderer({ canvas: threeCanvas, antialias: true, alpha: true });
+    renderer.toneMapping = THREE.ReinhardToneMapping;
+    
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(50, 16/9, 0.1, 500);
     camera.position.set(0, 40, 70);
+    
     const controls = new OrbitControls(camera, threeCanvas);
     controls.enableDamping = true;
     controls.autoRotate = true;
     controls.autoRotateSpeed = 0.5;
-    scene.add(new THREE.AmbientLight(0x666666));
-    const dir = new THREE.DirectionalLight(0xffffff, 0.8);
+    
+    // Lighting
+    scene.add(new THREE.AmbientLight(0x404040));
+    const dir = new THREE.DirectionalLight(0xffffff, 2);
     dir.position.set(30, 50, 30);
     scene.add(dir);
+    const blueLight = new THREE.PointLight(0x38bdf8, 5, 100);
+    blueLight.position.set(-20, 10, -20);
+    scene.add(blueLight);
+    const orangeLight = new THREE.PointLight(0xf59e0b, 5, 100);
+    orangeLight.position.set(20, 10, 20);
+    scene.add(orangeLight);
+
+    // Post-processing
+    const composer = new EffectComposer(renderer);
+    const renderPass = new RenderPass(scene, camera);
+    composer.addPass(renderPass);
+    
+    const bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 1.5, 0.4, 0.85);
+    bloomPass.threshold = 0.2;
+    bloomPass.strength = 0.8;
+    bloomPass.radius = 0.5;
+    composer.addPass(bloomPass);
 
     let surfaceMesh = null;
     const surfaceGroup = new THREE.Group();
     scene.add(surfaceGroup);
-    let pointsMesh = null;
-    let bestSphere = null;
-    let ellipseLine = null;
+    
+    // Visuals Container
+    const visuals = {
+        points: null,
+        best: null,
+        ellipsoid: null,
+        axes: [],
+        historyLine: null,
+        historyPoints: []
+    };
 
     function viridis(t) {
       // Simple viridis approximation
@@ -790,60 +835,166 @@ function f(x) {
       surfaceGroup.add(surfaceMesh);
     }
 
-    function updatePoints(batch, mean) {
-      if (pointsMesh) surfaceGroup.remove(pointsMesh);
-      const geom = new THREE.BufferGeometry();
-      const arr = new Float32Array(batch.length * 3);
-      for (let i = 0; i < batch.length; i++) {
-        arr[i*3] = batch[i].x;
-        arr[i*3+1] = 0.05;
-        arr[i*3+2] = batch[i].y;
-      }
-      geom.setAttribute('position', new THREE.BufferAttribute(arr,3));
-      const mat = new THREE.PointsMaterial({ color: 0x38bdf8, size: 0.6 });
-      pointsMesh = new THREE.Points(geom, mat);
-      surfaceGroup.add(pointsMesh);
+    // Shared resources
+    const particleTexture = (() => {
+      const canvas = document.createElement('canvas');
+      canvas.width = 32; canvas.height = 32;
+      const ctx = canvas.getContext('2d');
+      ctx.beginPath();
+      ctx.arc(16, 16, 14, 0, Math.PI * 2);
+      ctx.fillStyle = '#ffffff';
+      ctx.fill();
+      return new THREE.CanvasTexture(canvas);
+    })();
 
-      if (bestSphere) surfaceGroup.remove(bestSphere);
-      const sphereGeo = new THREE.SphereGeometry(0.6, 24, 24);
-      const sphereMat = new THREE.MeshStandardMaterial({ color: 0xfbbf24, emissive: 0xf59e0b, emissiveIntensity: 0.6 });
-      bestSphere = new THREE.Mesh(sphereGeo, sphereMat);
-      bestSphere.position.set(mean.x, 0.1, mean.y);
-      surfaceGroup.add(bestSphere);
+    function updatePoints(batch, mean) {
+      // 1. Update Candidate Points
+      if (visuals.points) {
+        // Attempt to reuse geometry if count matches
+        const currentCount = visuals.points.geometry.attributes.position.count;
+        if (currentCount === batch.length) {
+          const posArr = visuals.points.geometry.attributes.position.array;
+          for (let i = 0; i < batch.length; i++) {
+            posArr[i*3] = batch[i].x;
+            posArr[i*3+1] = 0.2; 
+            posArr[i*3+2] = batch[i].y;
+          }
+          visuals.points.geometry.attributes.position.needsUpdate = true;
+        } else {
+          surfaceGroup.remove(visuals.points);
+          visuals.points = null;
+        }
+      }
+
+      if (!visuals.points) {
+        const geom = new THREE.BufferGeometry();
+        const posArr = new Float32Array(batch.length * 3);
+        for (let i = 0; i < batch.length; i++) {
+          posArr[i*3] = batch[i].x;
+          posArr[i*3+1] = 0.2; 
+          posArr[i*3+2] = batch[i].y;
+        }
+        geom.setAttribute('position', new THREE.BufferAttribute(posArr, 3));
+        
+        const mat = new THREE.PointsMaterial({
+          color: 0x22d3ee,
+          map: particleTexture,
+          size: 0.8,
+          transparent: true,
+          opacity: 0.9,
+          depthWrite: false,
+          blending: THREE.AdditiveBlending
+        });
+        
+        visuals.points = new THREE.Points(geom, mat);
+        surfaceGroup.add(visuals.points);
+      }
+
+      // 2. Update Best Solution Sphere
+      if (!visuals.best) {
+        const sphereGeo = new THREE.SphereGeometry(0.5, 32, 32);
+        const sphereMat = new THREE.MeshStandardMaterial({
+          color: 0xfbbf24,
+          emissive: 0xf59e0b,
+          emissiveIntensity: 2.0,
+          toneMapped: false
+        });
+        visuals.best = new THREE.Mesh(sphereGeo, sphereMat);
+        surfaceGroup.add(visuals.best);
+      }
+      visuals.best.position.set(mean.x, 0.2, mean.y);
+
+      // 3. Update History Trail
+      visuals.historyPoints.push(new THREE.Vector3(mean.x, 0.2, mean.y));
+      if (visuals.historyPoints.length > 500) visuals.historyPoints.shift();
+      
+      if (visuals.historyLine) surfaceGroup.remove(visuals.historyLine);
+      if (visuals.historyPoints.length > 1) {
+        const curve = new THREE.CatmullRomCurve3(visuals.historyPoints);
+        const points = curve.getPoints(visuals.historyPoints.length * 2);
+        const lineGeo = new THREE.BufferGeometry().setFromPoints(points);
+        const lineMat = new THREE.LineBasicMaterial({
+          color: 0x6366f1,
+          transparent: true,
+          opacity: 0.5,
+          linewidth: 2
+        });
+        visuals.historyLine = new THREE.Line(lineGeo, lineMat);
+        surfaceGroup.add(visuals.historyLine);
+      }
     }
 
     function updateEllipse(mean, cov2x2) {
-      if (ellipseLine) surfaceGroup.remove(ellipseLine);
-      // Eigen decomposition of 2x2 covariance
+      // Eigen decomposition for 2x2 covariance
+      // [a b]
+      // [b c]
       const a = cov2x2[0], b = cov2x2[1], c = cov2x2[3];
       const trace = a + c;
       const det = a * c - b * b;
       const disc = Math.max(trace*trace/4 - det, 0);
-      const l1 = trace/2 + Math.sqrt(disc);
-      const l2 = trace/2 - Math.sqrt(disc);
-      const rx = Math.sqrt(Math.max(l1, 1e-6));
-      const ry = Math.sqrt(Math.max(l2, 1e-6));
-      const angle = Math.atan2(b, l1 - a); // eigenvector for l1
-      const pts = [];
-      for (let i = 0; i <= 64; i++) {
-        const t = (i / 64) * Math.PI * 2;
-        const x = rx * Math.cos(t);
-        const y = ry * Math.sin(t);
-        const xr = x * Math.cos(angle) - y * Math.sin(angle);
-        const yr = x * Math.sin(angle) + y * Math.cos(angle);
-        pts.push(new THREE.Vector3(mean.x + xr, 0.05, mean.y + yr));
+      const l1 = trace/2 + Math.sqrt(disc); // Largest eigenvalue
+      const l2 = trace/2 - Math.sqrt(disc); // Smallest
+      
+      // Radii
+      const r1 = Math.sqrt(Math.max(l1, 1e-9));
+      const r2 = Math.sqrt(Math.max(l2, 1e-9));
+      
+      // Angle of first eigenvector
+      const angle = Math.atan2(b, l1 - a);
+
+      // 1. Update Ellipsoid Mesh
+      if (!visuals.ellipsoid) {
+        const geo = new THREE.CylinderGeometry(1, 1, 1, 64);
+        const mat = new THREE.MeshPhysicalMaterial({
+          color: 0x38bdf8,
+          metalness: 0.1,
+          roughness: 0.1,
+          transmission: 0.6,
+          thickness: 0.5,
+          transparent: true,
+          opacity: 0.4,
+          side: THREE.DoubleSide
+        });
+        visuals.ellipsoid = new THREE.Mesh(geo, mat);
+        surfaceGroup.add(visuals.ellipsoid);
       }
-      const geo = new THREE.BufferGeometry().setFromPoints(pts);
-      const mat = new THREE.LineDashedMaterial({ color: 0x38bdf8, dashSize: 0.5, gapSize: 0.3, transparent: true, opacity: 0.8 });
-      ellipseLine = new THREE.LineLoop(geo, mat);
-      ellipseLine.computeLineDistances();
-      surfaceGroup.add(ellipseLine);
+      
+      visuals.ellipsoid.scale.set(r1, 0.05, r2);
+      visuals.ellipsoid.position.set(mean.x, 0.2, mean.y);
+      visuals.ellipsoid.rotation.y = -angle;
+
+      // 2. Update Axis Helpers
+      // We reuse arrows if they exist
+      const ensureAxis = (idx, color) => {
+        if (!visuals.axes[idx]) {
+           const dir = new THREE.Vector3(1, 0, 0);
+           const origin = new THREE.Vector3(0, 0, 0);
+           const arrow = new THREE.ArrowHelper(dir, origin, 1, color, 0.5, 0.3);
+           surfaceGroup.add(arrow);
+           visuals.axes[idx] = arrow;
+        }
+        return visuals.axes[idx];
+      };
+      
+      const major = ensureAxis(0, 0xff00ff);
+      const minor = ensureAxis(1, 0x00ffff);
+      
+      const updateArrow = (arrow, len, ang) => {
+        const dir = new THREE.Vector3(Math.cos(ang), 0, Math.sin(ang));
+        arrow.setDirection(dir);
+        arrow.setLength(len, 0.5, 0.3); // headLength, headWidth
+        arrow.position.set(mean.x, 0.2, mean.y);
+      };
+      
+      updateArrow(major, r1, angle);
+      updateArrow(minor, r2, angle + Math.PI/2);
     }
 
     function resizeRenderer() {
       const w = threeCanvas.clientWidth || 800;
       const h = 380;
       renderer.setSize(w, h, false);
+      composer.setSize(w, h);
       camera.aspect = w / h;
       camera.updateProjectionMatrix();
     }
@@ -852,7 +1003,7 @@ function f(x) {
 
     function renderThree() {
       controls.update();
-      renderer.render(scene, camera);
+      composer.render();
       requestAnimationFrame(renderThree);
     }
     renderThree();
@@ -872,8 +1023,36 @@ function f(x) {
       return [sxx/denom, sxy/denom, sxy/denom, syy/denom];
     }
 
+    function applySamplePreset() {
+      benchSelect.value = 'sphere';
+      lambdaInput.value = 24;
+      sigmaInput.value = 1.1;
+      itersInput.value = 180;
+      seedInput.value = 7;
+      boundsToggle.checked = false;
+      noisyToggle.checked = false;
+      covarModelSelect.value = 'auto';
+      if (mobileRefs.bench) mobileRefs.bench.value = benchSelect.value;
+      if (mobileRefs.lambda) mobileRefs.lambda.value = lambdaInput.value;
+      if (mobileRefs.sigma) mobileRefs.sigma.value = sigmaInput.value;
+      if (mobileRefs.iters) mobileRefs.iters.value = itersInput.value;
+      if (mobileRefs.seed) mobileRefs.seed.value = seedInput.value;
+      if (mobileRefs.covar) mobileRefs.covar.value = covarModelSelect.value;
+      if (mobileRefs.bounds) mobileRefs.bounds.checked = false;
+      if (mobileRefs.noisy) mobileRefs.noisy.checked = false;
+      updateBenchRecommendation(benchSelect.value);
+    }
+
+    function runSample() {
+      applySamplePreset();
+      setRunState(true);
+      run();
+    }
+
     async function run() {
+      setRunState(true);
       statusEl.textContent = 'Initializing wasm...';
+      updateChips();
       if (!wasmInitialized) {
         await init();
         wasmInitialized = true;
@@ -886,7 +1065,6 @@ function f(x) {
       const maxIter = Number(itersInput.value) || 250;
       const seed = Number(seedInput.value) || 42;
       const dim = currentDim(benchKey);
-      dimLabel.textContent = '2D surface view';
 
       const opts = buildOptions(lambda, maxIter, seed, dim);
 
@@ -898,6 +1076,11 @@ function f(x) {
 
       // Reset module-level history for new run and capture metadata
       optimizationHistory = [];
+      visuals.historyPoints = [];
+      if (visuals.historyLine) {
+        surfaceGroup.remove(visuals.historyLine);
+        visuals.historyLine = null;
+      }
       currentRunMetadata = {
         benchmark: benchKey,
         lambda: lambda,
@@ -1003,10 +1186,12 @@ function f(x) {
           pinnedRunId = pinnedRunId || record.id;
           renderLegend();
           renderStatsPanel(currentSummary);
+          updateChips();
         }
       };
 
       statusEl.textContent = `Running ${bench.title}...`;
+      updateChips();
       requestAnimationFrame(stepOnce);
     }
 
@@ -1078,8 +1263,7 @@ function f(x) {
       }
       const t1 = performance.now();
       const msg = `Baseline JS: best f=${bestF.toExponential(3)} in ${(t1-t0).toFixed(1)} ms`;
-      timingEl.textContent = msg;
-      hudJs.textContent = msg;
+      if (hudJs) hudJs.textContent = msg;
       return { bestF, ms: (t1-t0), bestX };
     }
 
@@ -1134,16 +1318,37 @@ function f(x) {
 
       bestEl.textContent = `best f = ${res.best_f.toExponential(3)}`;
       iterEl.textContent = `Iter ${hist[hist.length - 1].iter}`;
+      updateChips();
 
       renderPCAView(batch, dim);
     }
 
     runBtn.addEventListener('click', run);
+    if (quickRunBtn) quickRunBtn.addEventListener('click', run);
+    if (runSampleBtn) runSampleBtn.addEventListener('click', runSample);
+    [chartEmptyRun, threeEmptyRun].forEach((btn) => btn?.addEventListener('click', run));
+    [chartEmptySample, threeEmptySample].forEach((btn) => btn?.addEventListener('click', runSample));
+
+    if (reduceMotionToggle) {
+      reduceMotionToggle.addEventListener('click', () => {
+        const enabled = document.body.classList.toggle('reduce-motion');
+        reduceMotionToggle.setAttribute('aria-pressed', enabled ? 'true' : 'false');
+        reduceMotionOn = enabled;
+        applyReduceMotion();
+      });
+    }
+
+    inlinePresetBtns.forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const id = btn.dataset.presetId;
+        applyPresetById(id, { toast: true });
+      });
+    });
+
     runJsBtn.addEventListener('click', () => runJsBaseline());
-    const runMobileBtn = mustGet('run-mobile');
-    if (runMobileBtn) runMobileBtn.addEventListener('click', run);
     runRaceBtn.addEventListener('click', async () => {
       statusEl.textContent = 'Race: running WASM...';
+      updateChips();
       const benchKey = benchSelect.value;
       const bench = benchFns[benchKey];
       const lambda = Number(lambdaInput.value) || 32;
@@ -1172,23 +1377,14 @@ function f(x) {
       hudWasm.textContent = `${wasmRes.evals} evals, ${wasmMs.toFixed(1)} ms`;
 
       statusEl.textContent = 'Race: running JS baseline...';
+      updateChips();
       const jsRes = runJsBaseline(dim);
-      raceResults.replaceChildren();
-      const title = document.createElement('div');
-      title.className = 'font-semibold';
-      title.textContent = 'Race results';
-      const wasmLine = document.createElement('div');
-      wasmLine.textContent = `WASM: f=${wasmRes.best_f.toExponential(3)}, ${wasmMs.toFixed(1)} ms`;
-      const jsLine = document.createElement('div');
-      jsLine.textContent = `JS: f=${jsRes.bestF.toExponential(3)}, ${jsRes.ms.toFixed(1)} ms`;
-      raceResults.append(title, wasmLine, jsLine);
-      statusEl.textContent = 'Race complete';
+      
+      const resultMsg = `Race Complete!\nWASM: ${wasmRes.best_f.toExponential(3)} (${wasmMs.toFixed(1)}ms)\nJS: ${jsRes.bestF.toExponential(3)} (${jsRes.ms.toFixed(1)}ms)`;
+      showToast(resultMsg, 'success', 5000);
+      updateChips();
     });
-
-    dimInput.addEventListener('input', () => {
-      dimInput.value = 2;
-      dimLabel.textContent = '2D surface view';
-    });
+}
 
     const playLoop = () => {
       if (!playbackState.playing || playbackState.frames.length === 0) return;
@@ -1199,6 +1395,7 @@ function f(x) {
       updateEllipse(frame.mean, frame.cov);
       iterEl.textContent = `Iter ${frame.iter}`;
       bestEl.textContent = `best f = ${frame.bestF?.toExponential?.(3) ?? '–'}`;
+      updateChips();
       requestAnimationFrame(playLoop);
     };
 
@@ -1211,6 +1408,7 @@ function f(x) {
         updateEllipse(frame.mean, frame.cov);
         iterEl.textContent = `Iter ${frame.iter}`;
         bestEl.textContent = `best f = ${frame.bestF?.toExponential?.(3) ?? '–'}`;
+        updateChips();
       }
     });
 
@@ -1220,22 +1418,12 @@ function f(x) {
       if (playbackState.playing) requestAnimationFrame(playLoop);
     });
 
-    applyCustomBtn.addEventListener('click', async () => {
-      await monacoReady;
-      try {
-        const code = editor.getValue();
-        validateCustomCode(code);
-        const fn = new Function(`${code}; return f;`)();
-        if (typeof fn !== 'function') throw new Error('f is not a function');
-        customFn = fn;
-        benchSelect.value = 'custom';
-        statusEl.textContent = 'Custom objective applied';
-      } catch (e) {
-        alert('Invalid function: ' + e.message);
-      }
-    });
-
-    // Tutorial overlay (uses enhanced layout IDs)
+    // Register service worker for PWA/offline support (best-effort)
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register(swPath()).catch((err) => {
+        console.warn('Service worker registration failed', err);
+      });
+    }
     const tutorialSteps = [
       'Sampling: CMA-ES draws λ candidates from a multivariate normal around the mean.',
       'Selection: rank candidates, take top μ with log weights.',
@@ -1244,25 +1432,27 @@ function f(x) {
       'Restarts: optional IPOP/BIPOP strategies to escape local minima.'
     ];
     let tutorialIdx = 0;
-    const tutorialOverlay = mustGet('tutorial-overlay');
-    const tutorialContent = mustGet('tutorial-content');
-    const tutorialStepCount = mustGet('tutorial-step-count');
-    const tutorialPrev = mustGet('tutorial-prev');
-    const tutorialNext = mustGet('tutorial-next');
-    const tutorialClose = mustGet('tutorial-close');
-    const tutorialSkip = mustGet('tutorial-skip');
-    const startTutorialBtn = mustGet('start-tutorial');
+    const tutorialOverlay = document.getElementById('tutorial-overlay');
+    const tutorialContent = document.getElementById('tutorial-content');
+    const tutorialStepCount = document.getElementById('tutorial-step-count');
+    const tutorialPrev = document.getElementById('tutorial-prev');
+    const tutorialNext = document.getElementById('tutorial-next');
+    const tutorialClose = document.getElementById('tutorial-close');
+    const tutorialSkip = document.getElementById('tutorial-skip');
+    const startTutorialBtn = document.getElementById('start-tutorial');
 
     const renderTutorial = () => {
       if (!tutorialContent || !tutorialStepCount) return;
       tutorialContent.textContent = tutorialSteps[tutorialIdx];
       tutorialStepCount.textContent = `Step ${tutorialIdx + 1} of ${tutorialSteps.length}`;
     };
-    renderTutorial();
+    if (tutorialOverlay) renderTutorial();
 
     const openTutorial = () => {
-      if (tutorialOverlay) tutorialOverlay.classList.remove('hidden');
-      renderTutorial();
+      if (tutorialOverlay) {
+          tutorialOverlay.classList.remove('hidden');
+          renderTutorial();
+      }
     };
     const closeTutorial = () => {
       if (tutorialOverlay) tutorialOverlay.classList.add('hidden');
@@ -1281,23 +1471,15 @@ function f(x) {
     if (startTutorialBtn) startTutorialBtn.addEventListener('click', openTutorial);
 
     // Mobile bottom sheet controls + sync with desktop controls
-    const sheet = mustGet('mobile-sheet');
-    const handleBar = sheet?.querySelector('.handle-bar');
-    const closeSheet = mustGet('close-sheet');
-    const toggleAdvanced = mustGet('toggle-advanced');
-    const advancedOptions = mustGet('advanced-options');
+    const toggleAdvanced = document.getElementById('toggle-advanced') || document.getElementById('toggle-advanced-desktop');
+    const advancedOptions = document.getElementById('advanced-options');
 
-    const openSheet = () => sheet?.classList.add('open');
-    const closeSheetFn = () => sheet?.classList.remove('open');
-    const toggleSheet = () => sheet?.classList.toggle('open');
-
-    if (handleBar) handleBar.addEventListener('click', toggleSheet);
-    if (closeSheet) closeSheet.addEventListener('click', closeSheetFn);
     if (toggleAdvanced && advancedOptions) {
       toggleAdvanced.addEventListener('click', () => {
         const hidden = advancedOptions.classList.toggle('hidden');
         const arrow = toggleAdvanced.querySelector('svg');
         if (arrow) arrow.style.transform = hidden ? 'rotate(0deg)' : 'rotate(180deg)';
+        toggleAdvanced.setAttribute('aria-expanded', hidden ? 'false' : 'true');
       });
     }
 
@@ -1319,10 +1501,15 @@ function f(x) {
     });
 
     // Mobile run button uses the same run pipeline then closes the sheet
-    const runMobileBtn = mustGet('run-mobile');
+    var runMobileBtn = document.getElementById('run-mobile');
     if (runMobileBtn) runMobileBtn.addEventListener('click', () => {
       run();
-      closeSheetFn();
+      // If we want to close the pane on run:
+      // window.pane?.destroy({animate: true}); // No, we want to hide/lower it.
+      // window.pane?.moveToBreak('bottom'); 
+      // But pane is in the HTML script scope, not module scope.
+      // We'll let the user manage the sheet or add a global hook if needed.
+      // For now, just run.
     });
 
     // FPS HUD
@@ -1342,49 +1529,92 @@ function f(x) {
 
     // Background Three.js particles
     const canvas = bgCanvas;
-    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
-    const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1, 1000);
-    camera.position.z = 200;
-    const geometry = new THREE.BufferGeometry();
+    const rendererBg = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+    const sceneBg = new THREE.Scene();
+    const cameraBg = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1, 1000);
+    cameraBg.position.z = 200;
+    const geometryBg = new THREE.BufferGeometry();
     const COUNT = 800;
-    const positions = new Float32Array(COUNT * 3);
-    for (let i = 0; i < COUNT * 3; i++) positions[i] = (Math.random() - 0.5) * 400;
-    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-    const material = new THREE.PointsMaterial({ color: 0x38bdf8, size: 1.6, transparent: true, opacity: 0.6 });
-    const points = new THREE.Points(geometry, material);
-    scene.add(points);
+    const positionsBg = new Float32Array(COUNT * 3);
+    for (let i = 0; i < COUNT * 3; i++) positionsBg[i] = (Math.random() - 0.5) * 400;
+    geometryBg.setAttribute('position', new THREE.BufferAttribute(positionsBg, 3));
+    const materialBg = new THREE.PointsMaterial({ color: 0x38bdf8, size: 1.6, transparent: true, opacity: 0.6 });
+    const pointsBg = new THREE.Points(geometryBg, materialBg);
+    sceneBg.add(pointsBg);
 
-    const animateBg = () => {
-      points.rotation.y += 0.0008;
-      points.rotation.x += 0.0004;
-      renderer.render(scene, camera);
-      requestAnimationFrame(animateBg);
-    };
+    function startBg() {
+      if (reduceMotionOn || bgRaf) return;
+      const loop = () => {
+        pointsBg.rotation.y += 0.0008;
+        pointsBg.rotation.x += 0.0004;
+        rendererBg.render(sceneBg, cameraBg);
+        bgRaf = requestAnimationFrame(loop);
+      };
+      bgRaf = requestAnimationFrame(loop);
+    }
 
     // Optional 3D surface of the current benchmark (preview only, not exact scale)
     let surface;
     function buildSurface(fn) {
       if (surface) scene.remove(surface);
+      
       const planeSize = 60;
-      const res = 40;
+      const res = 80; // Higher resolution
       const geo = new THREE.PlaneGeometry(planeSize, planeSize, res, res);
-      const positions = geo.attributes.position;
-      for (let i = 0; i < positions.count; i++) {
-        const x = positions.getX(i) / 5; // shrink input
-        const y = positions.getY(i) / 5;
-        const z = -fn([x, y]);
-        positions.setZ(i, z);
+      const pos = geo.attributes.position;
+      
+      let min = Infinity, max = -Infinity;
+      
+      // 1. Calculate Z values and find range
+      for (let i = 0; i < pos.count; i++) {
+        const x = pos.getX(i) / 5; // shrink input domain
+        const y = pos.getY(i) / 5;
+        const z = -fn([x, y]); // Invert so peaks are high fitness (actually f is min, so -f is max?)
+        // Wait, CMA-ES minimizes f.
+        // If we plot -f, then the "valley" becomes a "peak".
+        // Usually optimization surfaces show the valley.
+        // So z should be f(x,y). But Three.js Y is up.
+        // If we want a valley, z should be f(x,y).
+        // But the original code used -fn([x,y]).
+        // Let's stick to -fn so "better" is "higher" visually?
+        // Or maybe "lower" is better.
+        // If I use -fn, then minima are maxima (hills).
+        // If I use fn, then minima are valleys.
+        // Visualizing valleys is more intuitive for "minimization".
+        // But let's check what the previous code did: `z = -fn([x,y])`.
+        // So it turned valleys into hills.
+        // I'll stick to that for consistency, or maybe invert it if I want valleys.
+        // Let's keep it as hills (maximization of negative cost).
+        pos.setZ(i, z);
+        if (z < min) min = z;
+        if (z > max) max = z;
       }
-      positions.needsUpdate = true;
+      
+      // 2. Vertex Colors
+      const colors = [];
+      const range = max - min + 1e-9;
+      for (let i = 0; i < pos.count; i++) {
+        const z = pos.getZ(i);
+        const t = (z - min) / range;
+        const rgb = viridis(t);
+        colors.push(((rgb >> 16) & 255) / 255, ((rgb >> 8) & 255) / 255, (rgb & 255) / 255);
+      }
+      geo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+      
       geo.computeVertexNormals();
-      const mat = new THREE.MeshStandardMaterial({
-        color: 0x38bdf8,
-        transparent: true,
-        opacity: 0.35,
+      
+      const mat = new THREE.MeshPhysicalMaterial({
+        vertexColors: true,
         side: THREE.DoubleSide,
-        flatShading: true,
+        flatShading: false,
+        metalness: 0.1,
+        roughness: 0.3,
+        transmission: 0.0, // Opaque surface is clearer for colors
+        reflectivity: 0.5,
+        clearcoat: 0.3,
+        clearcoatRoughness: 0.2
       });
+      
       surface = new THREE.Mesh(geo, mat);
       surface.rotation.x = -Math.PI / 2;
       scene.add(surface);
@@ -1400,13 +1630,14 @@ function f(x) {
 
     const onResize = () => {
       const w = window.innerWidth, h = window.innerHeight;
-      renderer.setSize(w, h);
-      camera.aspect = w / h;
-      camera.updateProjectionMatrix();
+      rendererBg.setSize(w, h);
+      cameraBg.aspect = w / h;
+      cameraBg.updateProjectionMatrix();
     };
     window.addEventListener('resize', onResize);
     onResize();
-    animateBg();
+    applyReduceMotion();
+    startBg();
 
     // Subtle GSAP float on panels
     gsap.utils.toArray('.panel').forEach((el, i) => {
@@ -1414,7 +1645,7 @@ function f(x) {
     });
 
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/wasm_cmaes/sw.js').catch((err) => {
+      navigator.serviceWorker.register(swPath()).catch((err) => {
         console.warn('Service worker registration failed', err);
       });
     }
@@ -1650,6 +1881,7 @@ function f(x) {
     }
 
     function renderStatsPanel(currentSummary) {
+      if (!comparisonStats) return;
       const pinned = pastRuns.find((r) => r.id === pinnedRunId);
       const last = lastRunId ? pastRuns.find((r) => r.id === lastRunId) : null;
 
@@ -1684,10 +1916,11 @@ function f(x) {
         : null;
       const deltaStr = deltaBest != null ? `Δbest vs pinned: ${deltaBest >= 0 ? '+' : ''}${deltaBest.toExponential(3)}` : 'Δbest: –';
       const evalStr = deltaEvals != null ? `Δevals: ${deltaEvals >= 0 ? '+' : ''}${deltaEvals}` : 'Δevals: –';
-      hudModel.textContent = `Model ${covarModelSelect.value} | ${deltaStr} | ${evalStr}`;
+      if (hudModel) hudModel.textContent = `Model ${covarModelSelect.value} | ${deltaStr} | ${evalStr}`;
     }
 
     function renderLegend() {
+      if (!comparisonLegend) return;
       comparisonLegend.replaceChildren();
       pastRuns.forEach((run) => {
         const pill = document.createElement('div');
@@ -1703,6 +1936,7 @@ function f(x) {
     }
 
     function renderParcoords() {
+      if (!parcoordsSvg) return;
       const width = parcoordsSvg.clientWidth || parcoordsSvg.getBoundingClientRect().width || 320;
       const height = parcoordsSvg.clientHeight || 180;
       const margin = { top: 10, right: 10, bottom: 20, left: 10 };
@@ -1778,6 +2012,7 @@ function f(x) {
     }
 
     function renderPCAView(batch, dim) {
+      if (!pcaContainer || !pcaSvg) return;
       if (dim <= 2) {
         pcaContainer.classList.add('hidden');
         return;
@@ -2016,41 +2251,47 @@ function f(x) {
       });
     }
 
-    pinRunBtn.addEventListener('click', () => {
-      if (!pastRuns.length) {
-        showToast('No run to pin yet', 'warning');
-        return;
-      }
-      pinnedRunId = pastRuns[pastRuns.length - 1].id;
-      renderLegend();
-      renderStatsPanel(currentSummary);
-      showToast('Pinned latest run', 'info', 1500);
-    });
+    if (pinRunBtn) {
+      pinRunBtn.addEventListener('click', () => {
+        if (!pastRuns.length) {
+          showToast('No run to pin yet', 'warning');
+          return;
+        }
+        pinnedRunId = pastRuns[pastRuns.length - 1].id;
+        renderLegend();
+        renderStatsPanel(currentSummary);
+        showToast('Pinned latest run', 'info', 1500);
+      });
+    }
 
-    compareLastBtn.addEventListener('click', () => {
-      if (!lastRunId) {
-        showToast('No previous run to compare', 'warning');
-        return;
-      }
-      pinnedRunId = lastRunId;
-      renderLegend();
-      renderStatsPanel(currentSummary);
-      showToast('Comparing against last run', 'info', 1500);
-    });
+    if (compareLastBtn) {
+      compareLastBtn.addEventListener('click', () => {
+        if (!lastRunId) {
+          showToast('No previous run to compare', 'warning');
+          return;
+        }
+        pinnedRunId = lastRunId;
+        renderLegend();
+        renderStatsPanel(currentSummary);
+        showToast('Comparing against last run', 'info', 1500);
+      });
+    }
 
-    clearOverlaysBtn.addEventListener('click', () => {
-      pastRuns = [];
-      pinnedRunId = null;
-      lastRunId = null;
-      overlayGroup.selectAll('path').remove();
-      comparisonLegend.replaceChildren();
-      comparisonStats.textContent = 'No comparison data yet';
-      showToast('Overlays cleared', 'info', 1200);
-    });
+    if (clearOverlaysBtn) {
+      clearOverlaysBtn.addEventListener('click', () => {
+        pastRuns = [];
+        pinnedRunId = null;
+        lastRunId = null;
+        overlayGroup.selectAll('path').remove();
+        if (comparisonLegend) comparisonLegend.replaceChildren();
+        if (comparisonStats) comparisonStats.textContent = 'No comparison data yet';
+        showToast('Overlays cleared', 'info', 1200);
+      });
+    }
 
     // Register service worker for PWA/offline support (best-effort)
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/wasm_cmaes/sw.js').catch((err) => {
+      navigator.serviceWorker.register(swPath()).catch((err) => {
         console.warn('Service worker registration failed', err);
       });
     }
