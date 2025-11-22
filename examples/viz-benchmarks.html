@@ -155,10 +155,6 @@
               <option value="first2">First 2 dims</option>
             </select>
           </div>
-          <div class="hidden">
-            <label class="block text-sm text-slate-400">Race mode</label>
-            <button id="run-race" class="w-full bg-fuchsia-500 hover:bg-fuchsia-400 text-slate-900 font-semibold px-3 py-2 rounded-lg transition">Run WASM vs JS</button>
-          </div>
         </div>
         <div class="space-y-2">
           <label class="block text-sm text-slate-400 flex items-center gap-2">
@@ -189,12 +185,11 @@
         </div>
         <div class="flex flex-wrap items-center gap-3">
           <button id="run" class="relative overflow-hidden font-semibold px-6 py-3 rounded-xl text-slate-900">
-            <span class="absolute inset-0 rounded-xl bg-gradient-to-r from-cyan-400 via-fuchsia-400 to-amber-300" style="animation: holoPulse 3s ease-in-out infinite;"></span>
+            <span class="absolute inset-0 rounded-xl bg-gradient-to-r from-cyan-400 via-sky-400 to-emerald-300" style="animation: holoPulse 3s ease-in-out infinite;"></span>
             <span class="absolute inset-[2px] rounded-xl bg-slate-900" style="box-shadow: 0 0 20px rgba(56,189,248,0.35);"></span>
-            <span class="relative z-10 flex items-center gap-2 text-cyan-100">🚀 Run the Live Demo (WASM)</span>
+            <span class="relative z-10 flex items-center gap-2 text-cyan-100 run-label">🚀 Run the Live Demo (WASM)</span>
           </button>
-          <button id="run-race" class="bg-amber-400/90 hover:bg-amber-300 text-slate-900 font-semibold px-4 py-2 rounded-lg transition">Race WASM vs JS</button>
-          <div class="text-sm text-slate-300">Race compares the rendered WASM run to a headless vanilla-JS baseline and reports both timings.</div>
+          <div class="text-sm text-slate-300">Runs CMA‑ES (WASM) and renders the full per-generation timeline. Use the scrub bar to navigate.</div>
         </div>
           <div class="text-xs text-slate-400 space-y-1">
           <div><span class="text-emerald-200">WASM</span> uses the Rust CMA-ES with SIMD (if enabled); chart drives the visible step loop on a 2D surface.</div>
@@ -218,7 +213,6 @@
           <canvas id="three-canvas" class="w-full h-[380px] rounded-lg"></canvas>
           <div class="absolute bottom-2 left-2 right-2 flex items-center gap-2 text-xs text-slate-200">
             <input id="scrub" type="range" min="0" max="0" value="0" class="w-full" />
-            <button id="scrub-play" class="px-2 py-1 rounded bg-slate-800">▶</button>
           </div>
         </div>
       </div>
@@ -469,7 +463,6 @@ function f(x) {
 
     const lineSvg = d3.select('#line');
     const scrub = mustGet('scrub');
-    const scrubPlay = mustGet('scrub-play');
     const playbackState = { frames: [], playing: false, idx: 0 };
     let currentHist = [];
     let currentMaxIter = null;
@@ -489,6 +482,8 @@ function f(x) {
     const lineDot = lineG.append('circle').attr('r', 4).attr('fill', '#f59e0b').attr('stroke', '#0f172a').attr('stroke-width', 1).style('display', 'none');
 
     const statusEl = document.getElementById('status');
+    const runButton = document.getElementById('run');
+    const runLabel = runButton?.querySelector('.run-label');
     const bestEl = document.getElementById('best-display');
     const iterEl = document.getElementById('iter-display');
     const hudFps = document.getElementById('hud-fps');
@@ -497,6 +492,8 @@ function f(x) {
     const hudIter = document.getElementById('hud-iter');
 
     let wasmInitialized = false;
+    let runActive = false;
+    let lastRunFinished = false;
 
     function currentDim(benchKey) {
       dimInput.value = 2;
@@ -757,6 +754,10 @@ function f(x) {
 
     async function run() {
       statusEl.textContent = 'Initializing wasm...';
+      runActive = true;
+      lastRunFinished = false;
+      playbackState.playing = false;
+      updateRunButton();
       if (!wasmInitialized) {
         await init();
         wasmInitialized = true;
@@ -848,6 +849,10 @@ function f(x) {
         } else {
           statusEl.textContent = `Done in ${iter} iterations / ${res.evals} evals`;
           document.getElementById('hud-wasm').textContent = `${res.evals} evals`;
+          runActive = false;
+          lastRunFinished = true;
+          playbackState.playing = false;
+          updateRunButton();
         }
       };
 
@@ -965,7 +970,37 @@ function f(x) {
       iterEl.textContent = `Iter ${hist[hist.length - 1].iter}`;
     }
 
-    bind('run', 'click', run);
+    const updateRunButton = () => {
+      if (!runButton) return;
+      if (runActive) {
+        runButton.disabled = true;
+        if (runLabel) runLabel.textContent = 'Running…';
+        return;
+      }
+      runButton.disabled = false;
+      if (!lastRunFinished || playbackState.frames.length === 0) {
+        if (runLabel) runLabel.textContent = '🚀 Run the Live Demo (WASM)';
+      } else if (playbackState.playing) {
+        if (runLabel) runLabel.textContent = '⏸ Pause replay';
+      } else {
+        if (runLabel) runLabel.textContent = '▶ Replay';
+      }
+    };
+
+    const onRunClick = () => {
+      if (runActive) return;
+      // If we have frames from a completed run, toggle replay
+      if (lastRunFinished && playbackState.frames.length > 0) {
+        playbackState.playing = !playbackState.playing;
+        if (playbackState.playing) requestAnimationFrame(playLoop);
+        updateRunButton();
+        return;
+      }
+      // Otherwise start a fresh run
+      run();
+    };
+
+    if (runButton) runButton.addEventListener('click', onRunClick);
     bind('run-race', 'click', async () => {
       statusEl.textContent = 'Race: running WASM...';
       const benchKey = benchSelect.value;
@@ -1034,13 +1069,9 @@ function f(x) {
     scrub.addEventListener('input', () => {
       const idx = Number(scrub.value) || 0;
       playbackState.idx = idx;
+      playbackState.playing = false;
       showFrame(playbackState.frames[idx]);
-    });
-
-    scrubPlay.addEventListener('click', () => {
-      playbackState.playing = !playbackState.playing;
-      scrubPlay.textContent = playbackState.playing ? '⏸' : '▶';
-      if (playbackState.playing) requestAnimationFrame(playLoop);
+      updateRunButton();
     });
 
     bind('apply-custom', 'click', async () => {
