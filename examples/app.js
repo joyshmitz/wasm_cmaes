@@ -343,6 +343,10 @@ function f(x) {
     const noiseMax = mustGet('noise-max');
     const noiseAdaptive = mustGet('noise-adaptive');
     const noisyToggle = mustGet('noisy-toggle');
+    const constraintStrategySelect = document.getElementById('constraint-strategy');
+    const resampleCapInput = document.getElementById('resample-cap');
+    const penaltyWeightInput = document.getElementById('penalty-weight');
+    const noisyToggle = mustGet('noisy-toggle');
     const timingEl = mustGet('timing');
     const raceResults = mustGet('race-results');
     const lambdaInput = mustGet('lambda');
@@ -401,6 +405,49 @@ function f(x) {
     let quickstartIdx = 0;
     let learnModeOn = false;
     let learnBadges = [];
+
+    function constraintConfig() {
+      return {
+        strategy: constraintStrategySelect?.value || 'penalty',
+        resampleCap: Math.max(1, Number(resampleCapInput?.value || 5)),
+        penaltyWeight: Math.max(0, Number(penaltyWeightInput?.value || 1000)),
+        lo: Number(boundLo.value) || -5,
+        hi: Number(boundHi.value) || 5,
+        boundsEnabled: boundsToggle.checked,
+      };
+    }
+
+    function augmentedPenalty(delta, w) {
+      return w * delta + 0.5 * w * delta * delta;
+    }
+
+    function applyConstraint(vec) {
+      const cfg = constraintConfig();
+      if (!cfg.boundsEnabled) return { vec, penalty: 0, ok: true };
+      let penalty = 0;
+      const clamped = [...vec];
+      for (let i = 0; i < clamped.length; i++) {
+        if (clamped[i] < cfg.lo) {
+          const d = cfg.lo - clamped[i];
+          penalty += augmentedPenalty(d, cfg.penaltyWeight);
+          clamped[i] = cfg.lo;
+        } else if (clamped[i] > cfg.hi) {
+          const d = clamped[i] - cfg.hi;
+          penalty += augmentedPenalty(d, cfg.penaltyWeight);
+          clamped[i] = cfg.hi;
+        }
+      }
+      const within = penalty === 0;
+      switch (cfg.strategy) {
+        case 'project':
+          return { vec: clamped, penalty, ok: true };
+        case 'resample':
+          return { vec, penalty, ok: within, wantResample: !within, cap: cfg.resampleCap, clamped };
+        case 'penalty':
+        default:
+          return { vec, penalty, ok: true };
+      }
+    }
     let quickstartIdx = 0;
     let learnModeOn = false;
     let learnBadges = [];
@@ -459,6 +506,9 @@ function f(x) {
         opts.noise.maxSamplesPerPoint = Math.max(opts.noise.maxSamplesPerPoint, 9);
         opts.noise.adaptive = true;
       }
+      if (penaltyWeightInput) {
+        opts.constraintPenalty = Number(penaltyWeightInput.value) || 1000;
+      }
       return opts;
     }
 
@@ -474,6 +524,9 @@ function f(x) {
       hi: getMobileEl('bound-hi'),
       covar: getMobileEl('covar-model'),
       noisy: document.getElementById('noisy-toggle-mobile'),
+      constraintStrategy: document.getElementById('constraint-strategy-mobile'),
+      resampleCap: document.getElementById('resample-cap-mobile'),
+      penaltyWeight: document.getElementById('penalty-weight-mobile'),
     };
 
     const loadRecentPresets = () => {
@@ -888,10 +941,29 @@ function f(x) {
         const fits = new Float64Array(lambda);
         const candidates = [];
         for (let k = 0; k < lambda; k++) {
-          const offset = k * dim;
-          const v = candFlat.slice(offset, offset + dim);
+          let offset = k * dim;
+          let v = candFlat.slice(offset, offset + dim);
+          let penalty = 0;
+          let attempts = 0;
+          while (true) {
+            const constraint = applyConstraint(v);
+            if (constraint.wantResample && attempts < (constraint.cap || 3)) {
+              attempts += 1;
+              offset = k * dim; // reuse same slice
+              v = candFlat.slice(offset, offset + dim);
+              continue;
+            }
+            if (constraint.wantResample) {
+              v = constraint.clamped;
+              penalty = constraint.penalty || 0;
+            } else {
+              v = constraint.vec;
+              penalty = constraint.penalty || 0;
+            }
+            break;
+          }
           candidates.push(Array.from(v));
-          fits[k] = bench.f(v);
+          fits[k] = bench.f(v) + penalty;
         }
         es.tell_flat(fits);
         const res = es.result();
@@ -992,23 +1064,27 @@ function f(x) {
       for (let iter=0; iter<maxIter; iter++) {
         const cand = [];
         for (let k=0;k<lambda;k++) {
-          const x = sample();
-          let f = bench.f(x);
-          if (boundsToggle.checked) {
-            const lo = Number(boundLo.value) || -5;
-            const hi = Number(boundHi.value) || 5;
-            let penalty = 0;
-            for (let i=0;i<dim;i++) {
-              let xi = x[i];
-              if (xi < lo) { penalty += (lo - xi) ** 2; xi = lo; }
-              else if (xi > hi) { penalty += (xi - hi) ** 2; xi = hi; }
-              x[i] = xi;
+          let tries = 0;
+          let x = sample();
+          let constraint;
+          while (true) {
+            constraint = applyConstraint(x);
+            if (constraint.wantResample && tries < (constraint.cap || 3)) {
+              tries += 1;
+              x = sample();
+              continue;
             }
-            f += 1e3 * penalty;
+            if (constraint.wantResample) {
+              x = constraint.clamped;
+            } else {
+              x = constraint.vec;
+            }
+            break;
           }
-        cand.push({x,f});
-        if (f < bestF) { bestF = f; bestX = x; }
-      }
+          let f = bench.f(x) + (constraint.penalty || 0);
+          cand.push({x,f});
+          if (f < bestF) { bestF = f; bestX = x; }
+        }
         cand.sort((a,b)=>a.f-b.f);
         const mu = Math.max(1, Math.floor(lambda/4));
         mean = Array(dim).fill(0);
@@ -1514,6 +1590,9 @@ function f(x) {
         hi: overrides.hi ?? boundHi.value
       });
       if (noisyToggle.checked) params.set('noisy', 'true');
+      if (penaltyWeightInput) params.set('penalty', penaltyWeightInput.value);
+      if (constraintStrategySelect) params.set('cstrategy', constraintStrategySelect.value);
+      if (resampleCapInput) params.set('rescap', resampleCapInput.value);
       return `${window.location.origin}${window.location.pathname}?${params.toString()}`;
     }
 
@@ -1565,6 +1644,9 @@ function f(x) {
         noisyToggle.checked = isNoisy;
         if (mobileRefs.noisy) mobileRefs.noisy.checked = isNoisy;
       }
+      if (params.has('penalty') && penaltyWeightInput) penaltyWeightInput.value = params.get('penalty');
+      if (params.has('cstrategy') && constraintStrategySelect) constraintStrategySelect.value = params.get('cstrategy');
+      if (params.has('rescap') && resampleCapInput) resampleCapInput.value = params.get('rescap');
 
       // Mirror to mobile controls if present
       if (mobileRefs.bench) mobileRefs.bench.value = benchSelect.value;
@@ -1576,6 +1658,9 @@ function f(x) {
       if (mobileRefs.bounds) mobileRefs.bounds.checked = boundsToggle.checked;
       if (mobileRefs.lo) mobileRefs.lo.value = boundLo.value;
       if (mobileRefs.hi) mobileRefs.hi.value = boundHi.value;
+      if (mobileRefs.constraintStrategy && constraintStrategySelect) mobileRefs.constraintStrategy.value = constraintStrategySelect.value;
+      if (mobileRefs.resampleCap && resampleCapInput) mobileRefs.resampleCap.value = resampleCapInput.value;
+      if (mobileRefs.penaltyWeight && penaltyWeightInput) mobileRefs.penaltyWeight.value = penaltyWeightInput.value;
 
       if (params.size > 0) {
         showToast('Configuration loaded from URL', 'info');
