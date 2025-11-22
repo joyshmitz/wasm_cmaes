@@ -153,6 +153,36 @@ function f(x) {
       custom: { lambda: 'Depends', sigma: 'Depends', tip: 'Check scaling; start with λ=32, σ=1.2.' }
     };
 
+    const quickstartSlides = [
+      { title: 'Pick a benchmark', body: 'Choose a test function and keep λ/σ defaults to see convergence behavior.' },
+      { title: 'Run & scrub', body: 'Hit Run, then scrub the timeline to replay iterations and inspect candidates.' },
+      { title: 'Race WASM vs JS', body: 'Use ⚡ Race to compare WebAssembly vs JS baseline; results show in the corner HUD.' },
+      { title: 'Share & presets', body: 'Copy a share link or tap a preset to load tuned λ/σ/bounds for tricky landscapes.' },
+      { title: 'Learn mode', body: 'Toggle Learn mode to see annotated hotspots (controls, chart, 3D, HUD).' },
+    ];
+
+    const glossaryItems = [
+      { term: 'λ (lambda)', desc: 'Population size per iteration. Higher = more exploration but more evals.' },
+      { term: 'σ (sigma)', desc: 'Step size; scales the search distribution. Increase to escape plateaus.' },
+      { term: 'Bounds', desc: 'Optional lower/upper limits; violations are penalized in fitness.' },
+      { term: 'Condition number', desc: 'Ratio of largest to smallest eigenvalue of covariance; high values mean the search ellipsoid is elongated/ill-conditioned.' },
+    ];
+
+    const quickstartSlides = [
+      { title: 'Pick a benchmark', body: 'Choose a test function and keep λ/σ defaults to see convergence behavior.' },
+      { title: 'Run & scrub', body: 'Hit Run, then scrub the timeline to replay iterations and inspect candidates.' },
+      { title: 'Race WASM vs JS', body: 'Use ⚡ Race to compare WebAssembly vs JS baseline; results show in the corner HUD.' },
+      { title: 'Share & presets', body: 'Copy a share link or tap a preset to load tuned λ/σ/bounds for tricky landscapes.' },
+      { title: 'Learn mode', body: 'Toggle Learn mode to see annotated hotspots (controls, chart, 3D, HUD).' },
+    ];
+
+    const glossaryItems = [
+      { term: 'λ (lambda)', desc: 'Population size per iteration. Higher = more exploration but more evals.' },
+      { term: 'σ (sigma)', desc: 'Step size; scales the search distribution. Increase to escape plateaus.' },
+      { term: 'Bounds', desc: 'Optional lower/upper limits; violations are penalized in fitness.' },
+      { term: 'Condition number', desc: 'Ratio of largest to smallest eigenvalue of covariance; high values mean the search ellipsoid is elongated/ill-conditioned.' },
+    ];
+
     const curatedPresets = [
       {
         id: 'sphere-quick',
@@ -213,6 +243,73 @@ function f(x) {
       const tip = benchTips[benchKey] || benchTips.custom;
       paramRecText.textContent = `λ ${tip.lambda}, σ ${tip.sigma}. ${tip.tip}`;
       paramRec.classList.remove('hidden');
+    }
+
+    function renderQuickstart() {
+      if (!quickstartContent || !quickstartDots) return;
+      const slide = quickstartSlides[quickstartIdx % quickstartSlides.length];
+      quickstartContent.innerHTML = `<div class="font-semibold text-sky-100 mb-1">${slide.title}</div><div>${slide.body}</div>`;
+      quickstartDots.replaceChildren();
+      quickstartSlides.forEach((_, i) => {
+        const dot = document.createElement('button');
+        dot.className = `w-2.5 h-2.5 rounded-full ${i === quickstartIdx ? 'bg-sky-400' : 'bg-slate-700'}`;
+        dot.addEventListener('click', () => { quickstartIdx = i; renderQuickstart(); });
+        quickstartDots.appendChild(dot);
+      });
+    }
+
+    function renderGlossary() {
+      if (!glossaryList) return;
+      glossaryList.replaceChildren();
+      glossaryItems.forEach((item) => {
+        const li = document.createElement('li');
+        li.innerHTML = `<span class="font-semibold text-sky-200">${item.term}:</span> <span class="text-slate-300">${item.desc}</span>`;
+        glossaryList.appendChild(li);
+      });
+    }
+
+    function clearLearnBadges() {
+      learnBadges.forEach((b) => b.remove());
+      learnBadges = [];
+    }
+
+    function addBadgeFor(el, text) {
+      const rect = el.getBoundingClientRect();
+      const badge = document.createElement('div');
+      badge.className = 'learn-badge';
+      badge.textContent = text;
+      badge.style.position = 'absolute';
+      badge.style.top = `${rect.top + window.scrollY + 4}px`;
+      badge.style.left = `${rect.left + window.scrollX + 4}px`;
+      badge.style.padding = '6px 8px';
+      badge.style.background = 'rgba(14,165,233,0.85)';
+      badge.style.color = '#0b1220';
+      badge.style.borderRadius = '999px';
+      badge.style.fontSize = '11px';
+      badge.style.fontWeight = '700';
+      badge.style.zIndex = '2000';
+      badge.style.pointerEvents = 'none';
+      document.body.appendChild(badge);
+      learnBadges.push(badge);
+    }
+
+    function renderLearnMode() {
+      clearLearnBadges();
+      if (!learnModeOn) return;
+      const targets = [
+        { id: 'bench', label: 'Benchmark' },
+        { id: 'lambda', label: 'λ (pop size)' },
+        { id: 'sigma', label: 'σ (step)' },
+        { id: 'run', label: 'Run' },
+        { id: 'run-race', label: 'WASM vs JS' },
+        { id: 'line', label: 'Convergence' },
+        { id: 'three-canvas', label: 'Surface + candidates' },
+        { id: 'hud', label: 'HUD' },
+      ];
+      targets.forEach(({ id, label }) => {
+        const el = document.getElementById(id);
+        if (el) addBadgeFor(el, label);
+      });
     }
 
     // Inject lucide icons
@@ -276,6 +373,12 @@ function f(x) {
     const paramRec = mustGet('param-recommendation');
     const paramRecText = mustGet('param-recommendation-text');
     const hudModel = mustGet('hud-model');
+    const learnToggle = document.getElementById('learn-mode-toggle');
+    const quickstartContent = document.getElementById('quickstart-content');
+    const quickstartPrev = document.getElementById('quickstart-prev');
+    const quickstartNext = document.getElementById('quickstart-next');
+    const quickstartDots = document.getElementById('quickstart-dots');
+    const glossaryList = document.getElementById('glossary-list');
 
     const lineSvg = d3.select('#line');
     const scrub = mustGet('scrub');
@@ -294,6 +397,12 @@ function f(x) {
     const parcoordsAxes = ['lambda', 'sigma', 'cond', 'best'];
     let lastImproveIter = 0;
     let stallNotified = false;
+    let quickstartIdx = 0;
+    let learnModeOn = false;
+    let learnBadges = [];
+    let quickstartIdx = 0;
+    let learnModeOn = false;
+    let learnBadges = [];
 
     const lineMargin = { top: 10, right: 10, bottom: 30, left: 50 };
     const width = 800, height = 320;
@@ -1797,6 +1906,21 @@ function f(x) {
         covarModelSelect.value = mobileRefs.covar.value;
         hudModel.textContent = `Model ${covarModelSelect.value}`;
       });
+    }
+
+    if (quickstartPrev && quickstartNext) {
+      quickstartPrev.addEventListener('click', () => { quickstartIdx = (quickstartIdx - 1 + quickstartSlides.length) % quickstartSlides.length; renderQuickstart(); });
+      quickstartNext.addEventListener('click', () => { quickstartIdx = (quickstartIdx + 1) % quickstartSlides.length; renderQuickstart(); });
+    }
+
+    if (learnToggle) {
+      learnToggle.addEventListener('click', () => {
+        learnModeOn = !learnModeOn;
+        learnToggle.classList.toggle('bg-amber-500', learnModeOn);
+        learnToggle.classList.toggle('text-slate-900', learnModeOn);
+        renderLearnMode();
+      });
+      window.addEventListener('resize', () => { if (learnModeOn) renderLearnMode(); });
     }
 
     benchSelect.addEventListener('change', () => updateBenchRecommendation(benchSelect.value));
