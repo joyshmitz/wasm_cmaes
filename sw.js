@@ -11,7 +11,6 @@ const STATIC_ASSETS = [
   `${BASE}/`,
   `${BASE}/index.html`,
   `${BASE}/examples/viz-benchmarks.html`,
-  `${BASE}/examples/viz-benchmarks-classic.html`,
   `${BASE}/examples/tailwind.css`,
   `${BASE}/examples/app.js`,
   `${BASE}/favicon.ico`,

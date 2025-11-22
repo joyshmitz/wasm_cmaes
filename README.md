@@ -35,7 +35,6 @@ Hyper-optimized **CMA-ES** (Covariance Matrix Adaptation Evolution Strategy) in 
 - [Performance considerations](#performance-considerations)
 - [Project layout](#project-layout)
 - [Deployment](#deployment)
-- [Contributing](#contributing)
 - [License](#license)
 
 ## 🎯 Why CMA-ES?
@@ -68,13 +67,13 @@ CMA-ES is a **state-of-the-art derivative-free optimization algorithm** that exc
 
 ```mermaid
 flowchart TB
-    subgraph Layer1["🌐 JavaScript/TypeScript API Layer"]
+    subgraph Layer1["🌐 JavaScript/TypeScript API"]
         direction TB
-        A1["✨ fmin()<br/>Convenience Function"]
-        A2["⚙️ WasmCmaes Class<br/>Full Control API"]
-        A3["🎯 CmaesRunner<br/>Event-Driven Helper"]
-        A4["📦 Batch API<br/>ask_flat() / tell()"]
-        A5["📊 Vanilla JS Baseline<br/>Performance Comparison"]
+        A1["fmin()"]
+        A2["WasmCmaes"]
+        A3["CmaesRunner"]
+        A4["Batch API"]
+        A5["JS Baseline"]
         
         A1 --> A2
         A2 --> A3
@@ -82,25 +81,25 @@ flowchart TB
         A5 -.->|"5-20× slower"| A1
     end
 
-    subgraph Layer2["🔗 wasm-bindgen Glue Layer"]
+    subgraph Layer2["🔗 wasm-bindgen"]
         direction TB
-        B1["🔌 wasm_bindgen<br/>Exports"]
-        B2["💾 serde_wasm_bindgen<br/>State Serialization"]
-        B3["📝 TypeScript<br/>Definitions"]
+        B1["wasm_bindgen"]
+        B2["serde_wasm_bindgen"]
+        B3["TypeScript"]
         
         B1 --> B2
         B1 --> B3
     end
 
-    subgraph Layer3["🦀 Rust Core Engine"]
+    subgraph Layer3["🦀 Rust Core"]
         direction TB
-        C1["🔄 Ask/Tell<br/>Iteration Loop"]
-        C2["📐 Covariance Update<br/>Full / Sep / LM"]
-        C3["📈 Sigma Adaptation<br/>Evolution Path"]
-        C4["🎲 LCG RNG<br/>+ SIMD Ops"]
-        C5["⚡ Rayon Parallel<br/>Ask (Optional)"]
-        C6["🚧 Constraint<br/>Handling"]
-        C7["🔄 Restart Strategies<br/>IPOP / BIPOP"]
+        C1["Ask/Tell Loop"]
+        C2["Covariance Update"]
+        C3["Sigma Adaptation"]
+        C4["RNG + SIMD"]
+        C5["Rayon Parallel"]
+        C6["Constraints"]
+        C7["Restarts"]
         
         C1 --> C2
         C2 --> C3
@@ -111,13 +110,13 @@ flowchart TB
         C1 --> C7
     end
 
-    subgraph Layer4["🎨 Rich Visualizations"]
+    subgraph Layer4["🎨 Visualizations"]
         direction TB
-        D1["📊 D3.js<br/>Convergence Plots"]
-        D2["🌐 Three.js<br/>3D Surfaces"]
-        D3["🔍 PCA Scatter<br/>High Dimensions"]
-        D4["📈 Parallel<br/>Coordinates"]
-        D5["✨ Animated<br/>Candidates"]
+        D1["D3.js"]
+        D2["Three.js"]
+        D3["PCA"]
+        D4["Parcoords"]
+        D5["Animation"]
         
         D1 --> D2
         D2 --> D3
@@ -125,19 +124,19 @@ flowchart TB
         D4 --> D5
     end
 
-    Layer1 -->|"API Calls"| Layer2
-    Layer2 -->|"WASM Bindings"| Layer3
+    Layer1 -->|"API"| Layer2
+    Layer2 -->|"WASM"| Layer3
     Layer4 -->|"Uses"| Layer1
 
-    classDef jsLayer fill:#f7df1e,stroke:#323330,stroke-width:3px,color:#000,font-weight:bold
-    classDef wasmLayer fill:#654ff0,stroke:#fff,stroke-width:3px,color:#fff,font-weight:bold
-    classDef rustLayer fill:#ce412b,stroke:#fff,stroke-width:3px,color:#fff,font-weight:bold
-    classDef vizLayer fill:#ff6b6b,stroke:#fff,stroke-width:3px,color:#fff,font-weight:bold
+    classDef jsLayer fill:#fef3c7,stroke:#f59e0b,stroke-width:1px,color:#78350f
+    classDef wasmLayer fill:#e9d5ff,stroke:#a855f7,stroke-width:1px,color:#581c87
+    classDef rustLayer fill:#fecdd3,stroke:#f43f5e,stroke-width:1px,color:#881337
+    classDef vizLayer fill:#fce7f3,stroke:#ec4899,stroke-width:1px,color:#831843
     
-    classDef jsNode fill:#f7df1e,stroke:#323330,stroke-width:2px,color:#000
-    classDef wasmNode fill:#9d7fff,stroke:#654ff0,stroke-width:2px,color:#fff
-    classDef rustNode fill:#ff6b6b,stroke:#ce412b,stroke-width:2px,color:#fff
-    classDef vizNode fill:#ff8787,stroke:#ff6b6b,stroke-width:2px,color:#fff
+    classDef jsNode fill:#fffbeb,stroke:#fbbf24,stroke-width:1px,color:#78350f
+    classDef wasmNode fill:#f3e8ff,stroke:#c084fc,stroke-width:1px,color:#581c87
+    classDef rustNode fill:#fff1f2,stroke:#fb7185,stroke-width:1px,color:#881337
+    classDef vizNode fill:#fdf2f8,stroke:#f9a8d4,stroke-width:1px,color:#831843
 
     class Layer1 jsLayer
     class Layer2 wasmLayer
@@ -813,8 +812,10 @@ npm publish --access public
 
 <div align="center">
 
-**Made using Rust, WebAssembly, and modern web technologies**
+**Made with ❤️ using Rust, WebAssembly, and modern web technologies**
 
 [⭐ Star on GitHub](https://github.com/Dicklesworthstone/wasm_cmaes) • [🐛 Report Bug](https://github.com/Dicklesworthstone/wasm_cmaes/issues) • [💡 Request Feature](https://github.com/Dicklesworthstone/wasm_cmaes/issues)
+
+**For users:** This project is actively maintained. If you encounter issues or have feature requests, please open an issue on GitHub.
 
 </div>
