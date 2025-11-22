@@ -140,6 +140,19 @@ function f(x) {
       },
     };
 
+    const benchTips = {
+      sphere: { lambda: '16–32', sigma: '0.8–1.2', tip: 'Smooth convex; smaller σ converges faster.' },
+      rastrigin: { lambda: '32–64', sigma: '1.5–2.5', tip: 'Highly multimodal; keep σ high and use higher λ.' },
+      ackley: { lambda: '24–48', sigma: '1.2–2.0', tip: 'Flat plateaus; bump σ if stuck.' },
+      griewank: { lambda: '32–48', sigma: '1.8–2.2', tip: 'Oscillatory; larger σ helps escape ridges.' },
+      schwefel: { lambda: '48–64', sigma: '2.5–3.5', tip: 'Deceptive; bounds help keep search stable.' },
+      levy: { lambda: '32–48', sigma: '1.4–2.0', tip: 'Broad ridges; moderate σ and patience.' },
+      zakharov: { lambda: '24–40', sigma: '1.0–1.6', tip: 'Ill-conditioned; watch condition number.' },
+      alpine: { lambda: '32–48', sigma: '1.5–2.5', tip: 'Many spikes; exploration heavy.' },
+      bukin6: { lambda: '24–40', sigma: '1.2–2.0', tip: 'Steep ridge; bounds strongly recommended.' },
+      custom: { lambda: 'Depends', sigma: 'Depends', tip: 'Check scaling; start with λ=32, σ=1.2.' }
+    };
+
     const curatedPresets = [
       {
         id: 'sphere-quick',
@@ -195,6 +208,12 @@ function f(x) {
 
     const RECENTS_KEY = 'cmaes-recent-presets';
     const MAX_RECENTS = 6;
+
+    function updateBenchRecommendation(benchKey) {
+      const tip = benchTips[benchKey] || benchTips.custom;
+      paramRecText.textContent = `λ ${tip.lambda}, σ ${tip.sigma}. ${tip.tip}`;
+      paramRec.classList.remove('hidden');
+    }
 
     // Inject lucide icons
     const parser = new DOMParser();
@@ -253,6 +272,8 @@ function f(x) {
     const pcaContainer = mustGet('pca-container');
     const pcaSvg = mustGet('pca-scatter');
     const parcoordsSvg = mustGet('param-parcoords');
+    const paramRec = mustGet('param-recommendation');
+    const paramRecText = mustGet('param-recommendation-text');
 
     const lineSvg = d3.select('#line');
     const scrub = mustGet('scrub');
@@ -269,6 +290,8 @@ function f(x) {
     let lastRunId = null;
     let currentSummary = null;
     const parcoordsAxes = ['lambda', 'sigma', 'cond', 'best'];
+    let lastImproveIter = 0;
+    let stallNotified = false;
 
     const lineMargin = { top: 10, right: 10, bottom: 30, left: 50 };
     const width = 800, height = 320;
@@ -737,6 +760,8 @@ function f(x) {
       playbackState.frames = [];
       playbackState.idx = 0;
       scrub.max = 0;
+      stallNotified = false;
+      lastImproveIter = 0;
 
       const stepOnce = () => {
         const lambda = es.lambda;
@@ -753,7 +778,10 @@ function f(x) {
         const res = es.result();
         const covArr = Array.from(es.cov_matrix());
         const cov2x2 = [covArr[0], covArr[1], covArr[2], covArr[3]];
-        bestF = Math.min(bestF, res.best_f);
+        if (res.best_f < bestF - 1e-12) {
+          bestF = res.best_f;
+          lastImproveIter = iter;
+        }
         history.push({ iter, best: bestF });
         iterCounter++;
 
@@ -776,6 +804,13 @@ function f(x) {
         const delta = history.length > 1 ? history[history.length - 2].best - res.best_f : 0;
         const boost = Math.max(1.0, Math.min(1.25, 1.0 + Math.abs(delta) * 2));
         gsap.fromTo(bestEl, { scale: 1 }, { scale: boost, duration: 0.35, ease: 'sine.out' });
+
+        if (!stallNotified && iter - lastImproveIter >= 50) {
+          stallNotified = true;
+          showToast('Progress stalled: try increasing σ (e.g., ×1.5) or λ.', 'warning', 4000);
+          paramRec.classList.remove('hidden');
+          paramRecText.textContent = 'Stall detected: consider σ ×1.5 or higher λ for more exploration.';
+        }
 
         iter++;
         const now = performance.now();
@@ -1716,6 +1751,7 @@ function f(x) {
 
     // Initialize: Load config from URL if present
     loadConfigFromURL();
+    updateBenchRecommendation(benchSelect.value);
     renderPresetGallery();
     renderPresetGallery(true);
     renderRecentPresets();
@@ -1728,6 +1764,14 @@ function f(x) {
     if (helpBtn) helpBtn.addEventListener('click', toggleHelp);
     if (helpCloseX) helpCloseX.addEventListener('click', toggleHelp);
     if (helpCloseBtn) helpCloseBtn.addEventListener('click', toggleHelp);
+
+    benchSelect.addEventListener('change', () => updateBenchRecommendation(benchSelect.value));
+    if (mobileRefs.bench) {
+      mobileRefs.bench.addEventListener('change', () => {
+        benchSelect.value = mobileRefs.bench.value;
+        updateBenchRecommendation(benchSelect.value);
+      });
+    }
 
     pinRunBtn.addEventListener('click', () => {
       if (!pastRuns.length) {
