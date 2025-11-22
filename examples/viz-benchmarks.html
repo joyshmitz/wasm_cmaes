@@ -218,7 +218,7 @@
     </section>
 
     <section class="grid lg:grid-cols-2 gap-4">
-      <div class="panel rounded-xl p-5 space-y-3">
+      <div class="panel rounded-xl p-5 space-y-3 lg:col-span-2">
         <div class="flex items-center justify-between">
           <div>
             <p class="text-xs text-slate-400">Custom objective</p>
@@ -228,21 +228,6 @@
         </div>
         <div class="text-xs text-slate-400">Function signature: <code>f(x: number[]): number</code>. Keep it deterministic for fair races.</div>
         <div id="editor" class="w-full h-56 rounded-lg overflow-hidden border border-slate-700 bg-slate-900"></div>
-      </div>
-
-      <div class="panel rounded-xl p-5 space-y-4">
-        <div class="flex items-center justify-between">
-          <div>
-            <p class="text-xs text-slate-400">Story mode</p>
-            <h3 class="text-lg text-amber-100 font-semibold">Guided CMA-ES</h3>
-          </div>
-          <div class="flex gap-2">
-            <button id="story-prev" class="px-3 py-2 rounded-lg bg-slate-800 text-slate-200">Prev</button>
-            <button id="story-next" class="px-3 py-2 rounded-lg bg-slate-800 text-slate-200">Next</button>
-            <button id="story-open" class="px-3 py-2 rounded-lg bg-amber-400/80 text-slate-900">Open</button>
-          </div>
-        </div>
-        <div id="story-text" class="text-slate-200 text-sm leading-relaxed">1) Sampling: CMA-ES draws λ candidates from a multivariate normal around the mean.</div>
       </div>
     </section>
   </div>
@@ -256,15 +241,6 @@
 
   <div id="race-results" class="fixed bottom-4 right-4 panel rounded-xl p-3 text-xs text-slate-200 space-y-1 min-w-[260px]"></div>
 
-  <div id="story-overlay" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-20 items-center justify-center">
-    <div class="panel rounded-xl p-6 max-w-xl space-y-3 text-slate-100">
-      <h3 class="text-xl font-semibold">CMA-ES story</h3>
-      <p id="story-overlay-text" class="text-sm"></p>
-      <div class="flex justify-end gap-2">
-        <button id="story-close" class="px-3 py-2 rounded-lg bg-slate-800 text-slate-200">Close</button>
-      </div>
-    </div>
-  </div>
   </div>
 
   <script type="module">
@@ -1103,26 +1079,6 @@ function f(x) {
         alert('Invalid function: ' + e.message);
       }
     });
-
-    // Story mode
-    const storySteps = [
-      'Sampling: CMA-ES draws λ candidates from a multivariate normal around the mean.',
-      'Selection: rank candidates, take top μ with log weights.',
-      'Adaptation: update mean, covariance (full/sep/lm), and step size σ.',
-      'Stop: ftarget, max evals, TolFun/TolX, or ill-conditioned covariance.',
-      'Restarts: optional IPOP/BIPOP strategies to escape local minima.'
-    ];
-    let storyIdx = 0;
-    const storyText = document.getElementById('story-text');
-    const storyOverlay = document.getElementById('story-overlay');
-    const storyOverlayText = document.getElementById('story-overlay-text');
-    const updateStory = () => { if (storyText) storyText.textContent = storySteps[storyIdx]; };
-    updateStory();
-    bind('story-prev', 'click', () => { storyIdx = (storyIdx - 1 + storySteps.length) % storySteps.length; updateStory(); });
-    bind('story-next', 'click', () => { storyIdx = (storyIdx + 1) % storySteps.length; updateStory(); });
-    bind('story-close', 'click', () => storyOverlay?.classList.add('hidden'));
-    bind('story-text', 'click', () => { if (storyOverlayText) storyOverlayText.textContent = storySteps[storyIdx]; storyOverlay?.classList.remove('hidden'); });
-    bind('story-open', 'click', () => { if (storyOverlayText) storyOverlayText.textContent = storySteps[storyIdx]; storyOverlay?.classList.remove('hidden'); });
 
     // FPS HUD
     let lastFrame = performance.now();
