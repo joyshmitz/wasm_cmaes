@@ -250,6 +250,9 @@ function f(x) {
     const clearOverlaysBtn = mustGet('clear-overlays');
     const comparisonLegend = mustGet('comparison-legend');
     const comparisonStats = mustGet('comparison-stats');
+    const pcaContainer = mustGet('pca-container');
+    const pcaSvg = mustGet('pca-scatter');
+    const parcoordsSvg = mustGet('param-parcoords');
 
     const lineSvg = d3.select('#line');
     const scrub = mustGet('scrub');
@@ -265,6 +268,7 @@ function f(x) {
     let pinnedRunId = null;
     let lastRunId = null;
     let currentSummary = null;
+    const parcoordsAxes = ['lambda', 'sigma', 'cond', 'best'];
 
     const lineMargin = { top: 10, right: 10, bottom: 30, left: 50 };
     const width = 800, height = 320;
@@ -918,6 +922,8 @@ function f(x) {
 
       bestEl.textContent = `best f = ${res.best_f.toExponential(3)}`;
       iterEl.textContent = `Iter ${hist[hist.length - 1].iter}`;
+
+      renderPCAView(batch, dim);
     }
 
     runBtn.addEventListener('click', run);
@@ -1316,6 +1322,15 @@ function f(x) {
       const median = sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
       const variance = bestValues.reduce((s, v) => s + (v - mean) ** 2, 0) / n;
       const std = Math.sqrt(variance);
+      let cond = 1;
+      try {
+        const stds = Array.from(metadata?.stds ?? []);
+        if (stds.length) {
+          const mn = Math.max(1e-12, Math.min(...stds));
+          const mx = Math.max(...stds);
+          cond = (mx / mn) ** 2;
+        }
+      } catch (_) { /* ignore */ }
       return {
         best: bestValues[bestValues.length - 1] ?? fallbackBest,
         mean,
@@ -1324,6 +1339,7 @@ function f(x) {
         bench: metadata?.benchmark || benchSelect.value,
         lambda: metadata?.lambda || Number(lambdaInput.value),
         sigma: metadata?.sigma || Number(sigmaInput.value),
+        cond,
       };
     }
 
@@ -1439,11 +1455,139 @@ function f(x) {
       });
     }
 
+    function renderParcoords() {
+      const width = parcoordsSvg.clientWidth || parcoordsSvg.getBoundingClientRect().width || 320;
+      const height = parcoordsSvg.clientHeight || 180;
+      const margin = { top: 10, right: 10, bottom: 20, left: 10 };
+      const innerW = width - margin.left - margin.right;
+      const innerH = height - margin.top - margin.bottom;
+      const svg = d3.select(parcoordsSvg);
+      svg.selectAll('*').remove();
+
+      if (!pastRuns.length) {
+        svg.append('text')
+          .attr('x', width / 2)
+          .attr('y', height / 2)
+          .attr('text-anchor', 'middle')
+          .attr('fill', '#94a3b8')
+          .attr('font-size', 12)
+          .text('No runs yet');
+        return;
+      }
+
+      const data = pastRuns.map((r) => ({
+        ...r.summary,
+        color: r.color,
+        label: r.label,
+      }));
+
+      const x = d3.scalePoint()
+        .domain(parcoordsAxes)
+        .range([0, innerW])
+        .padding(0.5);
+
+      const yScales = {};
+      parcoordsAxes.forEach((axis) => {
+        const vals = data.map((d) => d[axis]).filter((v) => Number.isFinite(v));
+        const min = Math.min(...vals);
+        const max = Math.max(...vals);
+        const pad = (max - min) * 0.1 + 1e-9;
+        yScales[axis] = d3.scaleLinear()
+          .domain([min - pad, max + pad])
+          .range([innerH, 0]);
+      });
+
+      const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
+
+      g.selectAll('.axis')
+        .data(parcoordsAxes)
+        .join('g')
+        .attr('class', 'axis')
+        .attr('transform', (d) => `translate(${x(d)},0)`)
+        .each(function(axis) {
+          d3.select(this).call(d3.axisLeft(yScales[axis]).ticks(4).tickSizeOuter(0));
+        })
+        .append('text')
+        .attr('y', -6)
+        .attr('fill', '#cbd5e1')
+        .attr('text-anchor', 'middle')
+        .attr('font-size', 10)
+        .text((d) => d);
+
+      const line = d3.line()
+        .defined(([, v]) => Number.isFinite(v))
+        .x(([axis]) => x(axis))
+        .y(([axis, v]) => yScales[axis](v));
+
+      g.selectAll('.par-line')
+        .data(data)
+        .join('path')
+        .attr('class', 'par-line')
+        .attr('fill', 'none')
+        .attr('stroke', (d) => d.color)
+        .attr('stroke-width', 2)
+        .attr('opacity', 0.75)
+        .attr('d', (d) => line(parcoordsAxes.map((axis) => [axis, d[axis]])));
+    }
+
+    function renderPCAView(batch, dim) {
+      if (dim <= 2) {
+        pcaContainer.classList.add('hidden');
+        return;
+      }
+      pcaContainer.classList.remove('hidden');
+      const width = pcaSvg.clientWidth || pcaSvg.getBoundingClientRect().width || 320;
+      const height = pcaSvg.clientHeight || 180;
+      const margin = { top: 10, right: 10, bottom: 20, left: 30 };
+      const innerW = width - margin.left - margin.right;
+      const innerH = height - margin.top - margin.bottom;
+      const svg = d3.select(pcaSvg);
+      svg.selectAll('*').remove();
+
+      if (!batch.length) {
+        svg.append('text')
+          .attr('x', width / 2)
+          .attr('y', height / 2)
+          .attr('text-anchor', 'middle')
+          .attr('fill', '#94a3b8')
+          .attr('font-size', 12)
+          .text('No points');
+        return;
+      }
+
+      const xs = batch.map((p) => p.x);
+      const ys = batch.map((p) => p.y);
+      const xScale = d3.scaleLinear().domain(d3.extent(xs)).nice().range([0, innerW]);
+      const yScale = d3.scaleLinear().domain(d3.extent(ys)).nice().range([innerH, 0]);
+
+      const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
+      g.append('g')
+        .attr('transform', `translate(0,${innerH})`)
+        .call(d3.axisBottom(xScale).ticks(4));
+      g.append('g')
+        .call(d3.axisLeft(yScale).ticks(4));
+
+      g.selectAll('circle')
+        .data(batch)
+        .join('circle')
+        .attr('cx', (d) => xScale(d.x))
+        .attr('cy', (d) => yScale(d.y))
+        .attr('r', 3)
+        .attr('fill', '#22d3ee')
+        .attr('opacity', 0.75);
+    }
+
     function addRunRecord(hist, res) {
       runCounter += 1;
       const color = overlayPalette[(runCounter - 1) % overlayPalette.length];
       const id = `run-${Date.now()}-${runCounter}`;
-      const summary = summarizeRun(hist, currentRunMetadata, res?.best_f);
+      const resMeta = {
+        benchmark: benchSelect.value,
+        lambda: Number(lambdaInput.value),
+        sigma: Number(sigmaInput.value),
+        stds: res?.stds ? Array.from(res.stds()) : undefined,
+      };
+      const summary = summarizeRun(hist, resMeta, res?.best_f);
       const record = {
         id,
         label: `Run ${runCounter} · ${benchSelect.value}`,
@@ -1455,6 +1599,7 @@ function f(x) {
       pastRuns.push(record);
       renderLegend();
       renderStatsPanel(summary);
+      renderParcoords();
       return record;
     }
     // Keyboard shortcuts
