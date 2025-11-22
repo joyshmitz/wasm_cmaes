@@ -5,12 +5,11 @@
 **Hyper-optimized CMA-ES in Rust compiled to WebAssembly**
 
 [![GitHub Pages](https://img.shields.io/badge/GitHub%20Pages-live-22c55e?style=for-the-badge&logo=github)](https://dicklesworthstone.github.io/wasm_cmaes/examples/viz-benchmarks.html)
-[![npm](https://img.shields.io/npm/v/cmaes_wasm?style=for-the-badge&logo=npm&color=cb3837)](https://www.npmjs.com/package/cmaes_wasm)
 [![Rust](https://img.shields.io/badge/Rust-nightly-orange?style=for-the-badge&logo=rust)](https://www.rust-lang.org/)
-[![License](https://img.shields.io/badge/License-MIT%20OR%20Apache--2.0-blue?style=for-the-badge)](LICENSE-MIT)
+[![License](https://img.shields.io/badge/License-MIT-blue?style=for-the-badge)](LICENSE-MIT)
 [![wasm-pack](https://img.shields.io/badge/wasm--pack-web-blueviolet?style=for-the-badge)](https://github.com/rustwasm/wasm-pack)
 
-**🚀 [Live Demo](https://dicklesworthstone.github.io/wasm_cmaes/examples/viz-benchmarks.html)** • **📦 [npm Package](https://www.npmjs.com/package/cmaes_wasm)** • **📚 [Documentation](#table-of-contents)**
+**🚀 [Live Demo](https://dicklesworthstone.github.io/wasm_cmaes/examples/viz-benchmarks.html)** • **📚 [Documentation](#table-of-contents)**
 
 </div>
 
@@ -18,7 +17,7 @@
 
 Hyper-optimized **CMA-ES** (Covariance Matrix Adaptation Evolution Strategy) in Rust compiled to WebAssembly with a first-class JavaScript/TypeScript experience. **SIMD acceleration**, optional **Rayon parallelism**, **deterministic seeds**, **batch API**, and a world-class visual playground (D3 + Tailwind + Three.js) — all running natively in the browser with zero server dependencies.
 
-**Latest release:** `v0.2.0` • Published to npm as `cmaes_wasm` and `cmaes_wasm-par`
+**Latest release:** `v0.2.0`
 
 ## Table of contents
 
@@ -146,14 +145,6 @@ flowchart LR
 
 ## 📦 Installation
 
-### 📥 From npm
-
-```bash
-npm install cmaes_wasm
-# or for parallel builds:
-npm install cmaes_wasm-par
-```
-
 ### 🛠️ Local development (no bundler required)
 
 Clone the repository and serve locally:
@@ -170,7 +161,7 @@ python -m http.server 8000
 ### 📦 With a bundler (Vite, Webpack, etc.)
 
 ```typescript
-import init, { fmin } from "cmaes_wasm";
+import init, { fmin } from "./pkg/cmaes_wasm.js";
 
 await init();
 // Use fmin() or other APIs
@@ -498,7 +489,6 @@ const res = fmin(new Float64Array([-1.5, 1.2]), 0.6, rosenbrock);
 This script:
 - Cleans `pkg/` and `pkg-par/` directories
 - Builds parallel bundle first (with SIMD and Rayon)
-- Renames `pkg-par/package.json` to avoid npm collision
 - Builds sequential bundle
 
 ### Environment variables
@@ -750,25 +740,6 @@ This script:
 **Pages URL**: https://dicklesworthstone.github.io/wasm_cmaes/
 
 **Note**: The script commits all staged changes, so ensure you're ready to commit before running.
-
-### Publishing to npm
-
-**Sequential bundle:**
-```bash
-cd pkg
-npm publish --access public
-```
-
-**Parallel bundle:**
-```bash
-cd pkg-par
-npm publish --access public
-```
-
-**Package names:**
-- `pkg/` → `cmaes_wasm`
-- `pkg-par/` → `cmaes_wasm-par`
-
 
 ## 📄 License
 
