@@ -1,9 +1,9 @@
 /* tslint:disable */
 /* eslint-disable */
-export function fmin_restarts(xstart: Float64Array, sigma: number, objective: Function, options?: any | null): FminResult;
 export function wasm_cmaes_from_state(state: any): WasmCmaes;
 export function fmin(xstart: Float64Array, sigma: number, objective: Function, options?: any | null): FminResult;
 export function fmin_builtin(objective_id: number, xstart: Float64Array, sigma: number, options?: any | null): FminResult;
+export function fmin_restarts(xstart: Float64Array, sigma: number, objective: Function, options?: any | null): FminResult;
 export class FminResult {
   private constructor();
   free(): void;

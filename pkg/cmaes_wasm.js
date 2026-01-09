@@ -202,6 +202,18 @@ function takeFromExternrefTable0(idx) {
     return value;
 }
 /**
+ * @param {any} state
+ * @returns {WasmCmaes}
+ */
+export function wasm_cmaes_from_state(state) {
+    const ret = wasm.wasm_cmaes_from_state(state);
+    if (ret[2]) {
+        throw takeFromExternrefTable0(ret[1]);
+    }
+    return WasmCmaes.__wrap(ret[0]);
+}
+
+/**
  * @param {Float64Array} xstart
  * @param {number} sigma
  * @param {Function} objective
@@ -244,18 +256,6 @@ export function fmin_restarts(xstart, sigma, objective, options) {
         throw takeFromExternrefTable0(ret[1]);
     }
     return FminResult.__wrap(ret[0]);
-}
-
-/**
- * @param {any} state
- * @returns {WasmCmaes}
- */
-export function wasm_cmaes_from_state(state) {
-    const ret = wasm.wasm_cmaes_from_state(state);
-    if (ret[2]) {
-        throw takeFromExternrefTable0(ret[1]);
-    }
-    return WasmCmaes.__wrap(ret[0]);
 }
 
 const FminResultFinalization = (typeof FinalizationRegistry === 'undefined')

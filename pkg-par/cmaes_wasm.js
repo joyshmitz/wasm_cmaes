@@ -202,21 +202,6 @@ function takeFromExternrefTable0(idx) {
     return value;
 }
 /**
- * @param {Float64Array} xstart
- * @param {number} sigma
- * @param {Function} objective
- * @param {any | null} [options]
- * @returns {FminResult}
- */
-export function fmin_restarts(xstart, sigma, objective, options) {
-    const ret = wasm.fmin_restarts(xstart, sigma, objective, isLikeNone(options) ? 0 : addToExternrefTable0(options));
-    if (ret[2]) {
-        throw takeFromExternrefTable0(ret[1]);
-    }
-    return FminResult.__wrap(ret[0]);
-}
-
-/**
  * @param {any} state
  * @returns {WasmCmaes}
  */
@@ -252,6 +237,21 @@ export function fmin(xstart, sigma, objective, options) {
  */
 export function fmin_builtin(objective_id, xstart, sigma, options) {
     const ret = wasm.fmin_builtin(objective_id, xstart, sigma, isLikeNone(options) ? 0 : addToExternrefTable0(options));
+    if (ret[2]) {
+        throw takeFromExternrefTable0(ret[1]);
+    }
+    return FminResult.__wrap(ret[0]);
+}
+
+/**
+ * @param {Float64Array} xstart
+ * @param {number} sigma
+ * @param {Function} objective
+ * @param {any | null} [options]
+ * @returns {FminResult}
+ */
+export function fmin_restarts(xstart, sigma, objective, options) {
+    const ret = wasm.fmin_restarts(xstart, sigma, objective, isLikeNone(options) ? 0 : addToExternrefTable0(options));
     if (ret[2]) {
         throw takeFromExternrefTable0(ret[1]);
     }
