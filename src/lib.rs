@@ -1,3 +1,6 @@
+// Suppress needless_range_loop as this crate uses indexed loops for clarity in numerical code
+#![allow(clippy::needless_range_loop)]
+
 use js_sys::{Array, Float64Array, Function, Object, Reflect};
 use nalgebra::linalg::SymmetricEigen;
 use nalgebra::DMatrix;
@@ -1791,7 +1794,7 @@ pub fn wasm_cmaes_from_state(state: &JsValue) -> Result<WasmCmaes, JsValue> {
 
 fn evaluate_objective_js(x: &[f64], objective: &Function) -> Result<f64, JsValue> {
     let js_x = Float64Array::from(x);
-    let v = objective.call1(&JsValue::NULL, &js_x).map_err(|e| e)?;
+    let v = objective.call1(&JsValue::NULL, &js_x)?;
     v.as_f64()
         .ok_or_else(|| JsValue::from_str("objective must return a number"))
 }
@@ -1832,7 +1835,7 @@ fn run_cma_js_objective(
             let mut sum_f = 0.0;
             for _ in 0..samples {
                 let js_x = Float64Array::from(x_eval.as_slice());
-                let v = objective.call1(&JsValue::NULL, &js_x).map_err(|e| e)?;
+                let v = objective.call1(&JsValue::NULL, &js_x)?;
                 let fx = v
                     .as_f64()
                     .ok_or_else(|| JsValue::from_str("objective must return a number"))?;
@@ -1859,13 +1862,13 @@ fn elli(x: &[f64]) -> f64 {
     let aratio: f64 = 1e3f64;
     let mut s = 0.0;
     let denom = (n - 1) as f64;
-    for i in 0..n {
+    for (i, &xi) in x.iter().enumerate() {
         let p = if n == 1 {
             0.0
         } else {
             2.0 * (i as f64) / denom
         };
-        s += x[i] * x[i] * aratio.powf(p);
+        s += xi * xi * aratio.powf(p);
     }
     s
 }
@@ -2057,8 +2060,8 @@ pub fn fmin_restarts_js(
 
         let mut xstart_run = x0.clone();
         if restart > 0 {
-            for i in 0..dim {
-                xstart_run[i] += rng.next_normal() * sigma;
+            for x in xstart_run.iter_mut().take(dim) {
+                *x += rng.next_normal() * sigma;
             }
         }
 
