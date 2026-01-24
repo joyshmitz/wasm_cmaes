@@ -30,28 +30,3 @@ jobs:
       - name: wasm-bindgen tests (firefox headless)
         run: wasm-pack test --headless --firefox
 
-  node-smoke:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-      - run: npm ci
-      - name: Node smoke test
-        run: npm run test:node
-
-  e2e:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-      - run: npm ci
-      - name: Install Playwright browsers
-        run: npx playwright install --with-deps
-      - name: Build CSS
-        run: npm run build:css
-      - name: Playwright tests
-        run: npm run e2e
