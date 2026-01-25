@@ -22,11 +22,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
       - name: Install wasm-pack
-        run: npm install -g wasm-pack
-      - name: wasm-bindgen tests (firefox headless)
-        run: wasm-pack test --headless --firefox
+        run: cargo install wasm-pack --locked
+      - name: Install Playwright Chromium
+        run: npx playwright install chromium
+      - name: wasm-bindgen tests (chrome headless)
+        run: wasm-pack test --headless --chrome
 
