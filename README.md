@@ -6,7 +6,7 @@
 
 [![GitHub Pages](https://img.shields.io/badge/GitHub%20Pages-live-22c55e?style=for-the-badge&logo=github)](https://dicklesworthstone.github.io/wasm_cmaes/examples/viz-benchmarks.html)
 [![Rust](https://img.shields.io/badge/Rust-nightly-orange?style=for-the-badge&logo=rust)](https://www.rust-lang.org/)
-[![License](https://img.shields.io/badge/License-MIT-blue?style=for-the-badge)](LICENSE-MIT)
+[![License](https://img.shields.io/badge/License-MIT%2BOpenAI%2FAnthropic%20Rider-blue-the-badge)](LICENSE-MIT)
 [![wasm-pack](https://img.shields.io/badge/wasm--pack-web-blueviolet?style=for-the-badge)](https://github.com/rustwasm/wasm-pack)
 
 **🚀 [Live Demo](https://dicklesworthstone.github.io/wasm_cmaes/examples/viz-benchmarks.html)** • **📚 [Documentation](#table-of-contents)**
@@ -743,7 +743,7 @@ This script:
 
 ## 📄 License
 
-- [`LICENSE-MIT`](LICENSE-MIT) — MIT License
+- [`LICENSE-MIT`](LICENSE-MIT) — MIT License (with OpenAI/Anthropic Rider)
 
 ---
 
