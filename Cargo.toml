@@ -21,3 +21,4 @@ rayon = { version = "1.8", optional = true }
 
 [dev-dependencies]
 wasm-bindgen-test = "0.3"
+proptest = "1"
