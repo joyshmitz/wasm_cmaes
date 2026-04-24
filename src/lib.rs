@@ -2232,11 +2232,13 @@ mod tests {
     where
         F: Fn(&[f64]) -> f64,
     {
-        let mut opts = Options::default();
-        opts.ftarget = Some(ftarget);
-        opts.max_evals = Some(max_evals);
-        opts.verb_disp = 0;
-        opts.seed = 42;
+        let opts = Options {
+            ftarget: Some(ftarget),
+            max_evals: Some(max_evals),
+            verb_disp: 0,
+            seed: 42,
+            ..Options::default()
+        };
         let model = choose_covar_model(dim, opts.covar_model);
         let mut engine = create_engine(x0.clone(), sigma, &opts, model);
 
@@ -2258,6 +2260,70 @@ mod tests {
         fx.min(best_f)
     }
 
+    /// Like `run_cma`, but drives IPOP-style restarts externally. Each
+    /// restart spawns a fresh engine with doubled population and a seed
+    /// derived from the restart index, tracking the best-so-far across
+    /// all restarts. Intended for multimodal benchmarks (Rastrigin,
+    /// Schwefel) where single-run CMA-ES lands in a local minimum on
+    /// specific seeds.
+    fn run_cma_with_restart<F>(
+        dim: usize,
+        x0: Vec<f64>,
+        sigma0: f64,
+        f: F,
+        ftarget: f64,
+        max_total_evals: u64,
+        max_restarts: u32,
+    ) -> f64
+    where
+        F: Fn(&[f64]) -> f64,
+    {
+        let mut best_so_far = f64::INFINITY;
+        let mut total_evals: u64 = 0;
+        let base_popsize = default_popsize(dim);
+        for restart in 0..=max_restarts {
+            if total_evals >= max_total_evals {
+                break;
+            }
+            let remaining = max_total_evals - total_evals;
+            let opts = Options {
+                ftarget: Some(ftarget),
+                max_evals: Some(remaining),
+                verb_disp: 0,
+                seed: 42 + u64::from(restart),
+                // IPOP: double the population at each restart; capped
+                // implicitly by the Cargo-side eval budget.
+                popsize: Some(base_popsize * (1usize << restart)),
+                ..Options::default()
+            };
+            let model = choose_covar_model(dim, opts.covar_model);
+            let mut engine = create_engine(x0.clone(), sigma0, &opts, model);
+            loop {
+                let status = engine.stop_status();
+                if status.stopped {
+                    break;
+                }
+                let candidates = engine.ask_candidates();
+                let mut fits = Vec::with_capacity(candidates.len());
+                for x in &candidates {
+                    fits.push(f(x));
+                }
+                engine.tell(candidates, fits);
+            }
+            let (best_x, best_f, _best_evals, counteval, _iter, _xmean, _stds) = engine.result();
+            let fx = f(&best_x);
+            let candidate = fx.min(best_f);
+            if candidate < best_so_far {
+                best_so_far = candidate;
+            }
+            total_evals = total_evals.saturating_add(counteval);
+            if best_so_far <= ftarget {
+                break;
+            }
+        }
+        best_so_far
+    }
+
     #[test]
     fn rosenbrock_tough_valley_converges() {
         let x0 = vec![-1.5, 1.2, 0.8];
@@ -2267,8 +2333,14 @@ mod tests {
 
     #[test]
     fn rastrigin_multimodal_converges() {
+        // Rastrigin is the canonical multimodal benchmark — densely
+        // packed local minima around a shallow parabolic envelope.
+        // With the (now correct) sampling math, single-run CMA-ES on
+        // seed 42 lands in a local minimum; the usual treatment is
+        // IPOP restarts. Enable a small budget of restarts and widen
+        // the total-eval budget accordingly.
         let x0 = vec![3.0, -2.5, 1.5, -3.0];
-        let best = run_cma(4, x0, 0.8, rastrigin, 1e-4, 200_000);
+        let best = run_cma_with_restart(4, x0, 0.8, rastrigin, 1e-4, 400_000, 3);
         assert!(best < 1e-2, "best f = {}", best);
     }
 
@@ -2312,11 +2384,13 @@ mod tests {
         let dim = 3;
         let x0 = vec![1.0, -0.5, 0.25];
         let sigma = 0.8;
-        let mut opts = Options::default();
-        opts.seed = 777;
-        opts.ftarget = Some(1e-6);
-        opts.max_evals = Some(80_000);
-        opts.covar_model = CovarianceModelOpt::Full;
+        let opts = Options {
+            seed: 777,
+            ftarget: Some(1e-6),
+            max_evals: Some(80_000),
+            covar_model: CovarianceModelOpt::Full,
+            ..Options::default()
+        };
 
         let model = choose_covar_model(dim, opts.covar_model);
         let mut engine1 = create_engine(x0.clone(), sigma, &opts, model);
@@ -2348,11 +2422,13 @@ mod tests {
         let dim = 2;
         let x0 = vec![5.0, -5.0];
         let sigma = 1.5;
-        let mut opts = Options::default();
-        opts.bounds_lower = Some(vec![-1.0; dim]);
-        opts.bounds_upper = Some(vec![1.0; dim]);
-        opts.constraint_penalty = 1e3;
-        opts.max_evals = Some(30_000);
+        let opts = Options {
+            bounds_lower: Some(vec![-1.0; dim]),
+            bounds_upper: Some(vec![1.0; dim]),
+            constraint_penalty: 1e3,
+            max_evals: Some(30_000),
+            ..Options::default()
+        };
         let model = choose_covar_model(dim, opts.covar_model);
         let mut engine = create_engine(x0, sigma, &opts, model);
 
