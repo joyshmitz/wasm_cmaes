@@ -609,7 +609,24 @@ impl DecomposingPositiveMatrix {
         let m = DMatrix::from_row_slice(n, n, &self.data);
         let eig = SymmetricEigen::new(m);
         self.eigenvalues = eig.eigenvalues.as_slice().to_vec();
-        self.eigenbasis = eig.eigenvectors.as_slice().to_vec();
+        // nalgebra's DMatrix is column-major internally and `as_slice()`
+        // returns the underlying buffer in that order, so a raw
+        // `as_slice().to_vec()` followed by `self.eigenbasis[idx(n, i, k)]`
+        // (row-major indexing) silently accesses `U[k, i]` rather than
+        // `U[i, k]`. Writing out the inv-sqrt via
+        //     s = sum_k U[k,i] * U[k,j] / sqrt(lambda_k)
+        // produces `U^T D U` rather than the intended `U D U^T = C^{-1/2}`,
+        // so `invsqrt * invsqrt` does not equal `C^{-1}` for any non-
+        // identity covariance (sign-flipped off-diagonals, verified by
+        // `invsqrt_squared_equals_c_inverse` on C = [[2,1],[1,3]]).
+        // Transpose into the crate's row-major `idx` convention here so
+        // the rest of the file stays consistent.
+        self.eigenbasis.resize(n * n, 0.0);
+        for i in 0..n {
+            for k in 0..n {
+                self.eigenbasis[idx(n, i, k)] = eig.eigenvectors[(i, k)];
+            }
+        }
 
         let mut min_ev = f64::INFINITY;
         let mut max_ev = 0.0;
@@ -2113,6 +2130,57 @@ pub fn fmin_restarts_js(
 mod tests {
     use super::*;
     use proptest::prelude::*;
+
+    /// Direct test: does `DecomposingPositiveMatrix::invsqrt` actually
+    /// equal `C^{-1/2}` (so that `invsqrt^T invsqrt == C^{-1}`), under
+    /// nalgebra's column-major storage of eigenvectors?
+    ///
+    /// The fixed covariance C = [[2, 1], [1, 3]] has analytic inverse
+    /// C^{-1} = (1/5) * [[3, -1], [-1, 2]] = [[0.6, -0.2], [-0.2, 0.4]].
+    /// After `update_eigensystem`, `invsqrt * invsqrt` must match that.
+    #[test]
+    fn invsqrt_squared_equals_c_inverse() {
+        let mut dpm = DecomposingPositiveMatrix::new(2);
+        // C = [[2, 1], [1, 3]] (row-major into dpm.data)
+        dpm.data[idx(2, 0, 0)] = 2.0;
+        dpm.data[idx(2, 0, 1)] = 1.0;
+        dpm.data[idx(2, 1, 0)] = 1.0;
+        dpm.data[idx(2, 1, 1)] = 3.0;
+
+        // Force the eigensystem to be computed this call.
+        dpm.update_eigensystem(1.0, 0.0);
+
+        // Build the matrix `A` whose entries are dpm.invsqrt, interpreted
+        // via the same `idx(n, i, j) = i*n + j` indexing the rest of the
+        // crate uses. Then compute A * A and compare to the known
+        // analytic C^{-1}.
+        let n = 2;
+        let a = |i: usize, j: usize| dpm.invsqrt[idx(n, i, j)];
+
+        let mut aa = [[0.0_f64; 2]; 2];
+        for i in 0..2 {
+            for j in 0..2 {
+                let mut s = 0.0;
+                for k in 0..2 {
+                    s += a(i, k) * a(k, j);
+                }
+                aa[i][j] = s;
+            }
+        }
+
+        let expected = [[0.6_f64, -0.2], [-0.2, 0.4]];
+        for i in 0..2 {
+            for j in 0..2 {
+                assert!(
+                    (aa[i][j] - expected[i][j]).abs() < 1e-9,
+                    "invsqrt * invsqrt at [{i},{j}] = {actual} but expected C^-1[{i},{j}] = {want}; \
+                     full result = {aa:?}",
+                    actual = aa[i][j],
+                    want = expected[i][j],
+                );
+            }
+        }
+    }
 
     fn rastrigin(x: &[f64]) -> f64 {
         // Global optimum at 0^n with f = 0.
