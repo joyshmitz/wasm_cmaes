@@ -1,7 +1,7 @@
 import {
+  type CmaesOptions,
+  type FminResult,
   WasmCmaes,
-  CmaesOptions,
-  FminResult,
   wasm_cmaes_from_state,
 } from "./pkg/cmaes_wasm";
 
@@ -19,11 +19,7 @@ export class CmaesRunner {
   events: RunnerEvents;
   private bestF: number;
 
-  constructor(
-    es: WasmCmaes,
-    objective: (x: Float64Array) => number,
-    events: RunnerEvents = {},
-  ) {
+  constructor(es: WasmCmaes, objective: (x: Float64Array) => number, events: RunnerEvents = {}) {
     this.es = es;
     this.objective = objective;
     this.dim = es.dimension;
@@ -70,10 +66,7 @@ export class CmaesRunner {
    * Convenience async loop that keeps calling step() until termination
    * (or maxSteps if provided), yielding to the browser between steps.
    */
-  async run(
-    maxSteps: number = Infinity,
-    timeBudgetMs: number = 16,
-  ): Promise<FminResult> {
+  async run(maxSteps: number = Infinity, timeBudgetMs: number = 16): Promise<FminResult> {
     let steps = 0;
     while (!this.es.stop_status().stopped && steps < maxSteps) {
       await this.step(timeBudgetMs);

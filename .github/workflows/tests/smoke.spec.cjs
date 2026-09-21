@@ -1,9 +1,9 @@
-const { test, expect } = require('@playwright/test');
+const { test, expect } = require("@playwright/test");
 
-test('viz page loads and runs', async ({ page }) => {
-  await page.goto('/examples/viz-benchmarks.html');
-  await expect(page.locator('#run')).toBeVisible();
-  await page.click('#run');
+test("viz page loads and runs", async ({ page }) => {
+  await page.goto("/examples/viz-benchmarks.html");
+  await expect(page.locator("#run")).toBeVisible();
+  await page.click("#run");
   await page.waitForTimeout(2000);
-  await expect(page.locator('#best-display')).not.toHaveText('–');
+  await expect(page.locator("#best-display")).not.toHaveText("–");
 });
